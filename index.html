@@ -1,0 +1,2426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Task-it-up</title>
+  <style>
+    :root{
+      --bg:#f5f8ff;
+      --panel:#ffffff;
+      --ink:#1f2937;
+      --muted:#6b7280;
+      --line:#e5e7eb;
+      --primary:#2563eb;
+      --primary-dark:#1d4ed8;
+      --primary-soft:#dbeafe;
+      --primary-rgb:37,99,235;
+      --success:#16a34a;
+      --warning:#ca8a04;
+      --danger:#dc2626;
+      --shadow:0 16px 38px rgba(31,41,55,.10);
+      --radius:22px;
+    }
+
+    *{box-sizing:border-box}
+    html{scroll-behavior:smooth}
+    body{
+      margin:0;
+      min-height:100vh;
+      background:
+        radial-gradient(circle at top left, rgba(var(--primary-rgb),.12), transparent 32%),
+        linear-gradient(180deg,#fbfdff 0%,var(--bg) 100%);
+      color:var(--ink);
+      font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    }
+
+    button,input,select,textarea{font:inherit}
+    button{cursor:pointer}
+    .hidden{display:none !important}
+
+    .app-shell{max-width:1180px;margin:0 auto;padding:22px}
+    .topbar{
+      display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:16px
+    }
+    .brand{display:flex;align-items:center;gap:13px;min-width:0}
+    .brand-mark{
+      width:52px;height:52px;border-radius:17px;display:grid;place-items:center;
+      background:linear-gradient(145deg,var(--primary),var(--primary-dark));
+      color:#fff;font-size:25px;font-weight:900;box-shadow:0 12px 24px rgba(var(--primary-rgb),.24);
+      flex:0 0 auto
+    }
+    .brand h1{margin:0;font-size:clamp(1.65rem,4vw,2.3rem);letter-spacing:-.04em}
+    .brand p{margin:3px 0 0;color:var(--muted);font-size:.9rem}
+    .top-actions{display:flex;align-items:center;gap:9px}
+    .live-time{
+      color:var(--muted);font-size:.8rem;font-weight:750;text-align:right;line-height:1.35
+    }
+
+    .btn{
+      border:0;border-radius:13px;padding:10px 15px;font-weight:800;transition:.18s ease
+    }
+    .btn:hover{transform:translateY(-1px)}
+    .btn-primary{background:var(--primary);color:#fff;box-shadow:0 8px 18px rgba(var(--primary-rgb),.20)}
+    .btn-primary:hover{background:var(--primary-dark)}
+    .btn-ghost{background:#fff;color:var(--ink);border:1px solid var(--line)}
+    .btn-soft{background:var(--primary-soft);color:var(--primary-dark)}
+    .btn-danger{background:#fff1f2;color:#b91c1c;border:1px solid #fecdd3}
+    .btn-sm{padding:6px 9px;border-radius:9px;font-size:.7rem}
+    .icon-btn{
+      width:42px;height:42px;border:1px solid var(--line);border-radius:13px;
+      background:#fff;color:var(--ink);display:grid;place-items:center;font-size:1.15rem
+    }
+
+    .main-tabs{
+      display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:18px;
+      background:rgba(255,255,255,.75);border:1px solid var(--line);border-radius:17px;padding:6px;
+      position:sticky;top:8px;z-index:8;backdrop-filter:blur(12px)
+    }
+    .main-tab{
+      border:0;border-radius:12px;background:transparent;color:var(--muted);
+      padding:11px 12px;font-weight:850
+    }
+    .main-tab.active{background:var(--primary);color:#fff;box-shadow:0 7px 15px rgba(var(--primary-rgb),.20)}
+
+    .panel{
+      background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+      box-shadow:var(--shadow)
+    }
+
+    .stats{
+      display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px
+    }
+    .stat{
+      background:rgba(255,255,255,.88);border:1px solid var(--line);border-radius:17px;padding:16px
+    }
+    .stat-label{color:var(--muted);font-size:.74rem;font-weight:800;text-transform:uppercase;letter-spacing:.07em}
+    .stat-value{font-size:1.55rem;font-weight:900;margin-top:5px}
+    .stat-sub{font-size:.76rem;color:var(--muted);margin-top:2px}
+
+    .progress-overview{
+      display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;
+      background:linear-gradient(135deg,var(--primary-soft),#fff);border:1px solid rgba(var(--primary-rgb),.2);
+      border-radius:18px;padding:16px;margin-bottom:12px
+    }
+    .progress-eyebrow{font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;font-weight:900;color:var(--primary-dark)}
+    .progress-headline{margin:4px 0 3px;font-size:1.08rem}
+    .progress-detail{font-size:.76rem;color:var(--muted)}
+    .progress-percent{font-size:1.8rem;font-weight:950;color:var(--primary-dark);font-variant-numeric:tabular-nums}
+    .overall-progress-track{grid-column:1 / -1;height:10px;background:rgba(255,255,255,.8);border-radius:999px;overflow:hidden;border:1px solid rgba(var(--primary-rgb),.12)}
+    .overall-progress-fill{height:100%;width:0;background:var(--primary);border-radius:inherit;transition:width .25s ease}
+
+    .view{display:none}
+    .view.active{display:block}
+
+    .plan-workspace{
+      display:grid;
+      grid-template-columns:minmax(300px,360px) minmax(0,1fr);
+      gap:16px;
+      align-items:start
+    }
+    .tasks-column{
+      position:sticky;
+      top:76px
+    }
+    .balanced-column{
+      min-width:0
+    }
+
+    .mini-timer-button{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      border:1px solid rgba(var(--primary-rgb),.28);
+      background:var(--primary);
+      color:#fff;
+      border-radius:11px;
+      padding:7px 10px;
+      font-size:.74rem;
+      font-weight:900;
+      font-variant-numeric:tabular-nums;
+      box-shadow:0 7px 15px rgba(var(--primary-rgb),.18)
+    }
+    .mini-timer-button .mini-phase{
+      opacity:.82;
+      font-size:.64rem;
+      text-transform:uppercase;
+      letter-spacing:.05em
+    }
+
+    .plan-panel,.tasks-panel,.timer-panel{padding:18px}
+    .tasks-column .tasks-panel{padding:16px}
+    .toolbar{
+      display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:15px
+    }
+    .toolbar h2{margin:0;font-size:1.18rem}
+    .hint{font-size:.79rem;color:var(--muted);line-height:1.4}
+    .toolbar-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+
+    .week-nav{
+      display:flex;align-items:center;justify-content:space-between;gap:10px;
+      background:#f8fafc;border:1px solid var(--line);border-radius:15px;padding:8px;margin-bottom:14px
+    }
+    .week-range{text-align:center;font-weight:850;font-size:.92rem}
+    .week-range small{display:block;color:var(--muted);font-size:.72rem;font-weight:650;margin-top:2px}
+    .week-arrow{
+      width:40px;height:40px;border-radius:11px;border:1px solid var(--line);background:#fff;
+      font-weight:900;color:var(--primary-dark)
+    }
+    .week-arrow:disabled{opacity:.35;cursor:not-allowed}
+
+    .schedule-grid{display:grid;grid-template-columns:1fr;gap:12px}
+    .day-card{border:1px solid var(--line);border-radius:17px;overflow:hidden;background:#fafafa}
+    .day-head{
+      display:flex;align-items:flex-start;justify-content:space-between;gap:12px;
+      padding:13px 14px;background:#fff;border-bottom:1px solid var(--line)
+    }
+    .day-head strong{display:block;font-size:.98rem}
+    .day-head span{display:block;color:var(--muted);font-size:.75rem;margin-top:2px}
+    .day-load{height:5px;background:#edf0f4;border-radius:999px;overflow:hidden;margin-top:8px}
+    .day-load > div{height:100%;background:var(--primary);border-radius:inherit}
+    .day-body{padding:10px;display:grid;grid-template-columns:1fr;gap:9px}
+    .block-bin{border:1px solid var(--line);border-radius:13px;background:#fff;overflow:hidden;width:100%}
+    .block-head{
+      display:flex;align-items:center;justify-content:space-between;gap:9px;padding:9px 10px;
+      background:#f8fafc;border-bottom:1px solid var(--line)
+    }
+    .block-title{font-size:.79rem;font-weight:900}
+    .block-meta{font-size:.69rem;color:var(--muted);font-weight:700}
+    .block-status{
+      display:inline-flex;padding:3px 6px;border-radius:999px;background:#f1f5f9;
+      color:var(--muted);font-size:.62rem;font-weight:850;margin-left:5px
+    }
+    .block-status.closed{background:#fee2e2;color:#b91c1c}
+    .block-body{display:grid;gap:8px;padding:8px;min-height:45px}
+    .plan-item{
+      border:1px solid var(--line);border-left:4px solid var(--primary);
+      border-radius:11px;padding:9px 10px;background:#fff
+    }
+    .plan-item.easy{border-left-color:#16a34a}
+    .plan-item.neutral{border-left-color:#eab308}
+    .plan-item.difficult{border-left-color:#dc2626}
+    .plan-item.done{background:#f0fdf4;border-color:#bbf7d0;opacity:.78}
+    .plan-item.done .plan-item-title{text-decoration:line-through;color:#4b5563}
+    .plan-item-title{font-size:.84rem;font-weight:850;line-height:1.3}
+    .plan-item[draggable="true"]{cursor:grab}
+    .plan-item.dragging{opacity:.42;cursor:grabbing}
+    .block-body.drag-over{background:var(--primary-soft);outline:2px dashed var(--primary);outline-offset:-4px}
+    .drag-hint{font-size:.61rem;color:var(--muted);font-weight:750;margin-top:5px}
+    .time-progress{margin-top:8px}
+    .time-progress-copy{display:flex;justify-content:space-between;gap:8px;font-size:.65rem;color:var(--muted);font-weight:780;margin-bottom:4px}
+    .time-progress-track{height:6px;background:#e5e7eb;border-radius:999px;overflow:hidden}
+    .time-progress-fill{height:100%;background:var(--primary);border-radius:inherit;transition:width .2s ease}
+    .time-progress-fill.over{background:#16a34a}
+    .time-overage{color:#15803d;font-weight:900}
+    .plan-item-row{
+      display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px;flex-wrap:wrap
+    }
+    .plan-item-meta{font-size:.69rem;color:var(--muted)}
+    .plan-item-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+    .start-timer-btn{
+      border:1px solid rgba(var(--primary-rgb),.28);background:var(--primary-soft);color:var(--primary-dark);
+      border-radius:8px;padding:4px 7px;font-size:.64rem;font-weight:900;white-space:nowrap
+    }
+    .complete-block-btn{
+      border:1px solid #bbf7d0;background:#f0fdf4;color:#15803d;border-radius:8px;
+      padding:4px 7px;font-size:.64rem;font-weight:900;white-space:nowrap
+    }
+    .complete-block-btn.undo{border-color:#d1d5db;background:#fff;color:#4b5563}
+    .redistribute-btn{
+      border:1px solid var(--line);background:#fff;color:var(--primary-dark);border-radius:8px;
+      padding:4px 7px;font-size:.63rem;font-weight:850;white-space:nowrap
+    }
+    .empty-slot{font-size:.72rem;color:var(--muted);padding:4px}
+    .footer-note{font-size:.75rem;color:var(--muted);line-height:1.45;margin-top:12px}
+
+    .timer-panel{text-align:center;min-height:540px;display:grid;place-items:center}
+    .timer-inner{width:min(640px,100%);padding:20px}
+    .timer-empty{color:var(--muted);padding:60px 16px}
+    .timer-phase{
+      display:inline-flex;padding:7px 12px;border-radius:999px;background:var(--primary-soft);
+      color:var(--primary-dark);font-weight:900;font-size:.8rem
+    }
+    .timer-task{font-size:1.2rem;font-weight:900;margin:12px 0 4px}
+    .timer-meta{color:var(--muted);font-size:.8rem}
+    .digital-clock{
+      font-size:clamp(4.6rem,18vw,9rem);line-height:1;font-weight:950;letter-spacing:-.07em;
+      font-variant-numeric:tabular-nums;margin:28px 0 24px
+    }
+    .analog-wrap{display:grid;place-items:center;margin:28px auto 24px}
+    .analog-clock{
+      width:min(320px,72vw);aspect-ratio:1;border-radius:50%;position:relative;
+      background:conic-gradient(var(--primary) var(--progress,0deg),#e5e7eb 0);
+      box-shadow:0 18px 40px rgba(31,41,55,.13)
+    }
+    .analog-clock::before{
+      content:"";position:absolute;inset:14px;border-radius:50%;background:#fff
+    }
+    .analog-hand{
+      position:absolute;left:50%;top:50%;width:3px;height:38%;background:var(--primary-dark);
+      transform-origin:50% 100%;transform:translate(-50%,-100%) rotate(var(--hand,0deg));
+      border-radius:999px;z-index:2
+    }
+    .analog-center{
+      position:absolute;inset:0;display:grid;place-items:center;z-index:3;font-size:2.3rem;
+      font-weight:950;font-variant-numeric:tabular-nums
+    }
+    .analog-dot{
+      position:absolute;left:50%;top:50%;width:14px;height:14px;border-radius:50%;
+      background:var(--primary-dark);transform:translate(-50%,-50%);z-index:4
+    }
+    .timer-actions{display:flex;justify-content:center;gap:9px;flex-wrap:wrap}
+
+    .progress-page{display:grid;gap:16px}
+    .progress-hero{
+      padding:20px;
+      background:
+        linear-gradient(135deg,rgba(var(--primary-rgb),.12),rgba(var(--primary-rgb),.03)),
+        #fff
+    }
+    .progress-heading{
+      display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap
+    }
+    .progress-heading h2{margin:0;font-size:1.28rem}
+    .progress-heading p{margin:5px 0 0;color:var(--muted);font-size:.81rem}
+    .progress-period{
+      display:inline-flex;align-items:center;padding:7px 10px;border-radius:999px;
+      background:var(--primary-soft);color:var(--primary-dark);font-size:.72rem;font-weight:900
+    }
+    .progress-summary-grid{
+      display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:11px;margin-top:16px
+    }
+    .progress-summary-card{
+      border:1px solid var(--line);border-radius:15px;background:#fff;padding:14px;min-width:0
+    }
+    .progress-summary-label{
+      color:var(--muted);font-size:.69rem;font-weight:850;text-transform:uppercase;letter-spacing:.06em
+    }
+    .progress-summary-value{
+      margin-top:5px;font-size:1.55rem;font-weight:950;letter-spacing:-.04em
+    }
+    .progress-summary-note{margin-top:3px;color:var(--muted);font-size:.7rem}
+
+    .progress-columns{
+      display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px
+    }
+    .progress-panel{padding:18px}
+    .progress-panel-head{
+      display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:15px
+    }
+    .progress-panel-head h3{margin:0;font-size:1rem}
+    .progress-panel-head span{font-size:.71rem;color:var(--muted)}
+    .difficulty-breakdown{display:grid;gap:12px}
+    .difficulty-progress-row{
+      display:grid;grid-template-columns:100px minmax(0,1fr) auto;gap:10px;align-items:center
+    }
+    .difficulty-progress-name{font-size:.76rem;font-weight:900}
+    .difficulty-progress-name.easy{color:#15803d}
+    .difficulty-progress-name.neutral{color:#a16207}
+    .difficulty-progress-name.difficult{color:#b91c1c}
+    .difficulty-progress-track{
+      height:10px;background:#eef1f5;border-radius:999px;overflow:hidden
+    }
+    .difficulty-progress-fill{height:100%;border-radius:inherit;min-width:0}
+    .difficulty-progress-fill.easy{background:#16a34a}
+    .difficulty-progress-fill.neutral{background:#eab308}
+    .difficulty-progress-fill.difficult{background:#dc2626}
+    .difficulty-progress-time{
+      font-size:.72rem;font-weight:850;color:var(--ink);white-space:nowrap;text-align:right
+    }
+
+    .weekly-chart{
+      height:230px;display:grid;grid-template-columns:repeat(7,minmax(0,1fr));
+      gap:8px;align-items:end;padding-top:10px
+    }
+    .chart-day{
+      height:100%;display:grid;grid-template-rows:1fr auto auto;gap:7px;align-items:end;min-width:0
+    }
+    .chart-bar-wrap{
+      height:100%;display:flex;align-items:flex-end;justify-content:center;
+      border-bottom:1px solid var(--line)
+    }
+    .chart-bar{
+      width:min(42px,72%);min-height:3px;border-radius:8px 8px 3px 3px;
+      background:linear-gradient(180deg,var(--primary),var(--primary-dark));
+      position:relative
+    }
+    .chart-bar[title]{cursor:help}
+    .chart-value{font-size:.62rem;color:var(--muted);font-weight:800;text-align:center}
+    .chart-label{font-size:.68rem;font-weight:850;text-align:center}
+    .chart-label.today{color:var(--primary-dark)}
+
+    .recent-focus-list{display:grid;gap:8px}
+    .recent-focus-item{
+      display:grid;grid-template-columns:10px minmax(0,1fr) auto;gap:10px;align-items:center;
+      border:1px solid var(--line);border-radius:12px;padding:10px;background:#fff
+    }
+    .recent-focus-dot{width:10px;height:10px;border-radius:50%}
+    .recent-focus-dot.easy{background:#16a34a}
+    .recent-focus-dot.neutral{background:#eab308}
+    .recent-focus-dot.difficult{background:#dc2626}
+    .recent-focus-title{font-size:.78rem;font-weight:850;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .recent-focus-meta{font-size:.67rem;color:var(--muted);margin-top:2px}
+    .recent-focus-time{font-size:.73rem;font-weight:900;white-space:nowrap}
+    .progress-empty{
+      border:1px dashed #cbd5e1;border-radius:13px;padding:28px 14px;text-align:center;
+      color:var(--muted);font-size:.78rem
+    }
+    .progress-history-note{
+      margin-top:12px;padding:9px 11px;border-radius:11px;background:#f8fafc;
+      color:var(--muted);font-size:.7rem;line-height:1.4
+    }
+
+    .tasks-header{
+      display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px
+    }
+    .add-task-tab-button{
+      border:1px solid rgba(var(--primary-rgb),.35);background:var(--primary);color:#fff;
+      border-radius:13px;padding:10px 15px;font-weight:900;box-shadow:0 7px 15px rgba(var(--primary-rgb),.18)
+    }
+    .task-form-panel{
+      padding:17px;margin-bottom:14px;background:#fff;border:1px solid var(--line);border-radius:17px
+    }
+    .form-title-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px}
+    .form-title-row h3{margin:0}
+    .field{margin-bottom:13px}
+    .field label{display:block;font-size:.81rem;font-weight:850;margin-bottom:6px}
+    .field small{display:block;color:var(--muted);font-size:.72rem;line-height:1.4;margin-top:4px}
+    input,select,textarea{
+      width:100%;border:1px solid var(--line);border-radius:11px;padding:10px 11px;
+      background:#fbfcfe;color:var(--ink);outline:none
+    }
+    textarea{min-height:74px;resize:vertical}
+    input:focus,select:focus,textarea:focus{
+      border-color:var(--primary);box-shadow:0 0 0 3px rgba(var(--primary-rgb),.10);background:#fff
+    }
+    .field-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .difficulty-segment{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+    .difficulty-segment input{display:none}
+    .difficulty-segment label{
+      margin:0;padding:10px 7px;border-radius:11px;text-align:center;cursor:pointer;
+      color:#fff;border:2px solid transparent;font-size:.77rem;font-weight:900;opacity:.55
+    }
+    .difficulty-segment label.easy-label{background:#16a34a}
+    .difficulty-segment label.neutral-label{background:#eab308;color:#422006}
+    .difficulty-segment label.difficult-label{background:#dc2626}
+    .difficulty-segment input:checked + label{
+      opacity:1;
+      border-color:#fff
+    }
+    #difficultyEasy:checked + label{
+      box-shadow:0 0 0 3px #16a34a
+    }
+    #difficultyNeutral:checked + label{
+      box-shadow:0 0 0 3px #ca8a04
+    }
+    #difficultyHard:checked + label{
+      box-shadow:0 0 0 3px #dc2626
+    }
+    .switch-line{
+      display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:11px;
+      border:1px solid var(--line);border-radius:12px;background:#fbfcfe;margin-bottom:10px
+    }
+    .switch-copy strong{display:block;font-size:.82rem}
+    .switch-copy span{display:block;color:var(--muted);font-size:.71rem;line-height:1.35;margin-top:2px}
+    .switch{position:relative;width:44px;height:25px;flex:0 0 auto}
+    .switch input{display:none}
+    .slider{position:absolute;inset:0;background:#d1d5db;border-radius:999px;transition:.2s}
+    .slider::after{
+      content:"";position:absolute;width:19px;height:19px;left:3px;top:3px;border-radius:50%;
+      background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.15);transition:.2s
+    }
+    .switch input:checked + .slider{background:var(--primary)}
+    .switch input:checked + .slider::after{transform:translateX(19px)}
+    .form-actions{display:flex;gap:8px;margin-top:14px}
+    .form-actions .btn{flex:1}
+
+    .task-tools{display:grid;grid-template-columns:1fr;gap:8px;margin-bottom:12px}
+    .task-tools input{min-width:0}
+    .task-tools select{width:100%}
+    .task-list{display:grid;gap:9px}
+    .task-card{
+      border:1px solid var(--line);border-radius:14px;background:#fff;padding:12px;
+      display:grid;grid-template-columns:10px 1fr auto;gap:10px;align-items:start
+    }
+    .task-card.completed{opacity:.55}
+    .task-card.completed .task-name{text-decoration:line-through}
+    .difficulty-dot{width:10px;height:10px;border-radius:50%;margin-top:6px}
+    .difficulty-dot.easy{background:#16a34a}
+    .difficulty-dot.neutral{background:#eab308}
+    .difficulty-dot.difficult{background:#dc2626}
+    .task-name{font-size:.9rem;font-weight:900}
+    .task-note{font-size:.73rem;color:var(--muted);margin-top:3px}
+    .task-progress-wrap{margin-top:9px}
+    .task-progress-copy{display:flex;justify-content:space-between;gap:8px;color:var(--muted);font-size:.66rem;font-weight:750;margin-bottom:4px}
+    .task-progress-track{height:6px;background:#e5e7eb;border-radius:999px;overflow:hidden}
+    .task-progress-fill{height:100%;background:var(--primary);border-radius:inherit;transition:width .2s ease}
+    .task-progress-secondary{font-size:.62rem;color:var(--muted);margin-top:5px}
+    .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}
+    .chip{
+      padding:4px 7px;border-radius:999px;background:#f1f5f9;color:#5b6472;
+      font-size:.65rem;font-weight:800
+    }
+    .task-actions{display:flex;gap:5px}
+    .tiny-icon{
+      width:31px;height:31px;border:1px solid var(--line);border-radius:9px;background:#fff;
+      color:var(--muted);display:grid;place-items:center
+    }
+    .task-action-text{
+      border:1px solid var(--line);border-radius:8px;background:#fff;color:#4b5563;
+      padding:5px 7px;font-size:.63rem;font-weight:850
+    }
+    .guide-card{
+      border:1px solid rgba(var(--primary-rgb),.18);background:var(--primary-soft);
+      border-radius:13px;padding:10px 11px;margin-bottom:12px
+    }
+    .guide-card strong{display:block;font-size:.78rem;color:var(--primary-dark)}
+    .guide-card span{display:block;font-size:.69rem;color:#4b5563;line-height:1.4;margin-top:2px}
+    .empty{
+      border:1px dashed #cbd5e1;border-radius:14px;padding:32px 15px;text-align:center;color:var(--muted)
+    }
+
+    .drawer-backdrop{
+      position:fixed;inset:0;background:rgba(15,23,42,.38);opacity:0;pointer-events:none;
+      transition:.22s;z-index:30
+    }
+    .drawer-backdrop.open{opacity:1;pointer-events:auto}
+    .settings-drawer{
+      position:fixed;top:0;right:0;width:min(460px,100vw);height:100vh;background:#fff;
+      transform:translateX(100%);transition:.25s;z-index:31;padding:20px;overflow-y:auto;
+      box-shadow:-20px 0 50px rgba(15,23,42,.2)
+    }
+    .settings-drawer.open{transform:translateX(0)}
+    .drawer-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:15px}
+    .drawer-head h2{margin:0}
+    .settings-card{border:1px solid var(--line);border-radius:15px;padding:13px;margin-bottom:12px;background:#fbfcfe}
+    .settings-card h3{margin:0 0 10px;font-size:.95rem}
+    .settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+    .settings-row{
+      display:grid;grid-template-columns:1fr 82px 82px;gap:7px;align-items:end;margin-bottom:8px
+    }
+    .settings-row strong{font-size:.76rem;padding-bottom:10px}
+    .settings-row label{font-size:.65rem;color:var(--muted);font-weight:800}
+    .theme-swatches{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}
+    .theme-swatch{
+      aspect-ratio:1;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 1px #d1d5db
+    }
+    .theme-swatch.active{box-shadow:0 0 0 3px var(--ink)}
+    .settings-actions{display:grid;gap:8px}
+    .sound-choice-row{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end}
+    .sound-preview-btn{white-space:nowrap}
+
+    .fatal-error{
+      position:fixed;inset:16px;z-index:100;display:grid;place-items:center;
+      background:rgba(15,23,42,.55);backdrop-filter:blur(4px)
+    }
+    .fatal-error-card{
+      width:min(520px,100%);background:#fff;border-radius:18px;padding:22px;
+      border:1px solid var(--line);box-shadow:var(--shadow);text-align:left
+    }
+    .fatal-error-card h2{margin:0 0 8px;font-size:1.2rem}
+    .fatal-error-card p{margin:0 0 14px;color:var(--muted);line-height:1.5;font-size:.86rem}
+    .fatal-error-actions{display:flex;gap:8px;flex-wrap:wrap}
+
+    .toast{
+      position:fixed;right:20px;bottom:20px;background:#111827;color:#fff;padding:11px 14px;
+      border-radius:12px;box-shadow:var(--shadow);opacity:0;transform:translateY(16px);
+      pointer-events:none;transition:.2s;z-index:40
+    }
+    .toast.show{opacity:1;transform:translateY(0)}
+
+    @media(max-width:720px){
+      .app-shell{padding:13px}
+      .brand p{display:none}
+      .brand-mark{width:45px;height:45px;border-radius:14px}
+      .live-time{display:none}
+      .main-tabs{top:5px}
+      .plan-workspace{grid-template-columns:1fr}
+      .tasks-column{position:static}
+      .stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+      .stat{padding:13px}
+      .progress-overview{grid-template-columns:1fr auto;padding:13px}
+      .progress-percent{font-size:1.5rem}
+      .field-row{grid-template-columns:1fr}
+      .difficulty-segment{grid-template-columns:1fr}
+      .task-card{grid-template-columns:10px 1fr}
+      .task-actions{grid-column:2}
+      .settings-row{grid-template-columns:1fr 75px 75px}
+      .theme-swatches{grid-template-columns:repeat(7,1fr)}
+      .timer-panel{min-height:470px;padding:10px}
+      .progress-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .progress-columns{grid-template-columns:1fr}
+      .difficulty-progress-row{grid-template-columns:88px minmax(0,1fr) auto}
+      .weekly-chart{height:200px;gap:5px}
+      .toolbar-actions{width:100%}
+      .toolbar-actions .btn{flex:1}
+      .toast{left:13px;right:13px;bottom:13px;text-align:center}
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark">✓</div>
+        <div>
+          <h1>Task-it-up</h1>
+          <p>Balanced planning that adapts to your time and energy.</p>
+        </div>
+      </div>
+      <div class="top-actions">
+        <div class="live-time" id="liveTime"></div>
+        <button class="icon-btn" id="settingsBtn" aria-label="Open settings" title="Settings">⚙</button>
+      </div>
+    </header>
+
+    <nav class="main-tabs" aria-label="Main sections">
+      <button class="main-tab active" data-view="planView">Plan</button>
+      <button class="main-tab" data-view="timerView">Timer</button>
+      <button class="main-tab" data-view="progressView">Progress</button>
+    </nav>
+
+    <main>
+      <section id="planView" class="view active">
+        <div class="plan-workspace">
+          <div class="tasks-column">
+
+
+        <div class="panel tasks-panel">
+          <div class="tasks-header">
+            <div>
+              <h2 style="margin:0;font-size:1.18rem">Your tasks</h2>
+              <div class="hint" id="taskCountLabel">0 tasks</div>
+            </div>
+            <button class="add-task-tab-button" id="openTaskFormBtn">+ Add a task</button>
+          </div>
+<div id="taskFormPanel" class="task-form-panel hidden">
+            <div class="form-title-row">
+              <h3 id="formTitle">Add a task</h3>
+              <button class="tiny-icon" type="button" id="closeTaskFormBtn" aria-label="Close task form">×</button>
+            </div>
+
+            <form id="taskForm">
+              <input id="editingId" type="hidden" />
+
+              <div class="field">
+                <label for="taskName">Task name *</label>
+                <input id="taskName" required placeholder="e.g., Finalize research paper" />
+              </div>
+
+              <div class="field">
+                <label for="notes">Notes</label>
+                <textarea id="notes" placeholder="Helpful details..."></textarea>
+              </div>
+
+              <div class="field">
+                <label>Task difficulty</label>
+                <div class="difficulty-segment">
+                  <input type="radio" name="difficulty" id="difficultyEasy" value="1" />
+                  <label class="easy-label" for="difficultyEasy">Want to</label>
+
+                  <input type="radio" name="difficulty" id="difficultyNeutral" value="2" checked />
+                  <label class="neutral-label" for="difficultyNeutral">Neutral</label>
+
+                  <input type="radio" name="difficulty" id="difficultyHard" value="3" />
+                  <label class="difficult-label" for="difficultyHard">Avoiding it</label>
+                </div>
+              </div>
+
+              <div class="field-row">
+                <div class="field">
+                  <label for="amount">Amount *</label>
+                  <input id="amount" type="number" min=".25" step=".25" value="1" required />
+                </div>
+                <div class="field">
+                  <label for="unit">Unit</label>
+                  <select id="unit">
+                    <option value="hours">hours</option>
+                    <option value="minutes">minutes</option>
+                    <option value="meals">meals</option>
+                    <option value="pages">pages</option>
+                    <option value="problems">problems</option>
+                    <option value="sessions">sessions</option>
+                    <option value="items">items</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="field-row">
+                <div class="field">
+                  <label for="deadline">Deadline</label>
+                  <input id="deadline" type="date" />
+                </div>
+                <div class="field">
+                  <label for="deadlineBlock">Deadline block</label>
+                  <select id="deadlineBlock">
+                    <option value="">No specific block</option>
+                    <option value="morning">Morning</option>
+                    <option value="afternoon">Afternoon</option>
+                    <option value="evening">Evening</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="switch-line">
+                <div class="switch-copy">
+                  <strong>Recurring task</strong>
+                  <span>Repeat preparation for meetings, chores, and routines.</span>
+                </div>
+                <label class="switch">
+                  <input id="recurring" type="checkbox" />
+                  <span class="slider"></span>
+                </label>
+              </div>
+
+              <div id="recurringFields" class="hidden">
+                <div class="field-row">
+                  <div class="field">
+                    <label for="frequency">Repeat</label>
+                    <select id="frequency">
+                      <option value="weekly">Weekly</option>
+                      <option value="daily">Daily</option>
+                      <option value="monthly">Monthly</option>
+                    </select>
+                  </div>
+                  <div class="field" id="weekdayWrap">
+                    <label for="weekday">On</label>
+                    <select id="weekday">
+                      <option value="0">Sunday</option><option value="1">Monday</option>
+                      <option value="2">Tuesday</option><option value="3">Wednesday</option>
+                      <option value="4">Thursday</option><option value="5">Friday</option>
+                      <option value="6">Saturday</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="field">
+                  <label for="repeatUntil">Repeat until</label>
+                  <input id="repeatUntil" type="date" />
+                </div>
+              </div>
+
+              <div class="switch-line">
+                <div class="switch-copy">
+                  <strong>Do all at once</strong>
+                  <span>Keep the work together instead of dividing it across days.</span>
+                </div>
+                <label class="switch">
+                  <input id="allAtOnce" type="checkbox" />
+                  <span class="slider"></span>
+                </label>
+              </div>
+
+              <div class="form-actions">
+                <button class="btn btn-ghost hidden" id="cancelEditBtn" type="button">Cancel</button>
+                <button class="btn btn-primary" id="saveTaskBtn" type="submit">Add task</button>
+              </div>
+            </form>
+          </div>
+
+          <div class="task-tools">
+            <input id="searchInput" placeholder="Search tasks..." />
+            <select id="filterSelect">
+              <option value="all">All tasks</option>
+              <option value="deadline">With deadline</option>
+              <option value="nodeadline">No deadline</option>
+              <option value="recurring">Recurring</option>
+              <option value="difficult">Difficult</option>
+            </select>
+          </div>
+          <div class="task-list" id="taskList"></div>
+        </div>
+      
+        
+          </div>
+
+          <div class="balanced-column">
+
+
+        <div class="progress-overview">
+          <div>
+            <div class="progress-eyebrow">Visible seven-day plan</div>
+            <h3 class="progress-headline" id="progressHeadline">No work completed yet</h3>
+            <div class="progress-detail" id="progressDetail">Complete a work block to begin tracking progress.</div>
+          </div>
+          <div class="progress-percent" id="progressPercent">0%</div>
+          <div class="overall-progress-track"><div class="overall-progress-fill" id="overallProgressFill"></div></div>
+        </div>
+
+        <div class="stats">
+          <div class="stat"><div class="stat-label">Blocks done</div><div class="stat-value" id="statCompletedBlocks">0</div><div class="stat-sub">in this seven-day view</div></div>
+          <div class="stat"><div class="stat-label">Blocks left</div><div class="stat-value" id="statRemainingBlocks">0</div><div class="stat-sub">still to complete</div></div>
+          <div class="stat"><div class="stat-label">Focus logged</div><div class="stat-value" id="statCompletedEffort">0m</div><div class="stat-sub">completed timer work</div></div>
+          <div class="stat"><div class="stat-label">Time left</div><div class="stat-value" id="statRemainingEffort">0m</div><div class="stat-sub">against time estimates</div></div>
+        </div>
+
+        <div class="panel plan-panel">
+          <div class="toolbar">
+            <div>
+              <h2>Balanced plan</h2>
+              <div class="hint" id="planSubtitle">The next seven days, based on current availability.</div>
+            </div>
+            <div class="toolbar-actions">
+              <button class="mini-timer-button hidden" id="miniTimerButton" type="button" title="Open running timer">
+                <span class="mini-phase" id="miniTimerPhase">Focus</span>
+                <span id="miniTimerDisplay">20:00</span>
+              </button>
+              <button class="btn btn-soft" id="rebalanceBtn">Rebalance</button>
+            </div>
+          </div>
+
+          <div class="week-nav">
+            <button class="week-arrow" id="prevWeekBtn" aria-label="Previous seven days">‹</button>
+            <div class="week-range" id="weekRange"></div>
+            <button class="week-arrow" id="nextWeekBtn" aria-label="Next seven days">›</button>
+          </div>
+
+          <div class="schedule-grid" id="scheduleGrid"></div>
+          <div class="footer-note" id="footerNote"></div>
+        </div>
+      
+        
+          </div>
+        </div>
+      </section>
+
+      <section id="timerView" class="view">
+        <div class="panel timer-panel">
+          <div class="timer-inner">
+            <div id="timerEmpty" class="timer-empty">Start a timer from any scheduled task in the Plan tab.</div>
+            <div id="timerActive" class="hidden">
+              <div class="timer-phase" id="timerPhase">Focus</div>
+              <div class="timer-task" id="timerTaskName"></div>
+              <div class="timer-meta" id="timerTaskMeta"></div>
+
+              <div id="digitalTimer" class="digital-clock">20:00</div>
+              <div id="analogTimer" class="analog-wrap hidden">
+                <div class="analog-clock" id="analogClock">
+                  <div class="analog-hand" id="analogHand"></div>
+                  <div class="analog-center" id="analogCenter">20:00</div>
+                  <div class="analog-dot"></div>
+                </div>
+              </div>
+
+              <div class="timer-actions">
+                <button class="btn btn-primary" id="timerStartPauseBtn">Pause</button>
+                <button class="btn btn-ghost" id="timerResetBtn">Reset</button>
+                <button class="btn btn-soft" id="timerCompleteBtn">Mark block done</button>
+                <button class="btn btn-soft" id="timerBackBtn">Back to plan</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="progressView" class="view">
+        <div class="progress-page">
+          <div class="panel progress-hero">
+            <div class="progress-heading">
+              <div>
+                <h2>Focus progress</h2>
+                <p>See how much focused work you completed today and throughout the current week.</p>
+              </div>
+              <div class="progress-period" id="progressWeekLabel">This week</div>
+            </div>
+
+            <div class="progress-summary-grid">
+              <div class="progress-summary-card">
+                <div class="progress-summary-label">Focused today</div>
+                <div class="progress-summary-value" id="progressTodayTotal">0m</div>
+                <div class="progress-summary-note" id="progressTodaySessions">0 completed sessions</div>
+              </div>
+              <div class="progress-summary-card">
+                <div class="progress-summary-label">Focused this week</div>
+                <div class="progress-summary-value" id="progressWeekTotal">0m</div>
+                <div class="progress-summary-note" id="progressWeekSessions">0 completed sessions</div>
+              </div>
+              <div class="progress-summary-card">
+                <div class="progress-summary-label">Most focused category</div>
+                <div class="progress-summary-value" id="progressTopDifficulty">—</div>
+                <div class="progress-summary-note" id="progressTopDifficultyTime">No focus recorded yet</div>
+              </div>
+              <div class="progress-summary-card">
+                <div class="progress-summary-label">Daily average</div>
+                <div class="progress-summary-value" id="progressDailyAverage">0m</div>
+                <div class="progress-summary-note">Monday through today</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="progress-columns">
+            <div class="panel progress-panel">
+              <div class="progress-panel-head">
+                <div>
+                  <h3>Today by difficulty</h3>
+                  <span>Completed focus sessions today</span>
+                </div>
+              </div>
+              <div class="difficulty-breakdown" id="todayDifficultyBreakdown"></div>
+            </div>
+
+            <div class="panel progress-panel">
+              <div class="progress-panel-head">
+                <div>
+                  <h3>This week by difficulty</h3>
+                  <span>Monday through Sunday</span>
+                </div>
+              </div>
+              <div class="difficulty-breakdown" id="weekDifficultyBreakdown"></div>
+            </div>
+          </div>
+
+          <div class="panel progress-panel">
+            <div class="progress-panel-head">
+              <div>
+                <h3>Focus across the week</h3>
+                <span>Minutes completed each day</span>
+              </div>
+            </div>
+            <div class="weekly-chart" id="weeklyFocusChart"></div>
+          </div>
+
+          <div class="panel progress-panel">
+            <div class="progress-panel-head">
+              <div>
+                <h3>Recent focus sessions</h3>
+                <span>Your latest completed focus blocks</span>
+              </div>
+            </div>
+            <div class="recent-focus-list" id="recentFocusList"></div>
+            <div class="progress-history-note" id="progressHistoryNote">
+              Dated progress begins with focus sessions completed in this version. Earlier task-level focus totals remain visible in the Plan.
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <div class="drawer-backdrop" id="drawerBackdrop"></div>
+  <aside class="settings-drawer" id="settingsDrawer">
+    <div class="drawer-head">
+      <h2>Settings</h2>
+      <button class="icon-btn" id="closeSettingsBtn" aria-label="Close settings">×</button>
+    </div>
+
+    <div class="settings-card">
+      <h3>Planning blocks</h3>
+      <div class="switch-line">
+        <div class="switch-copy">
+          <strong>Divide days into three blocks</strong>
+          <span>Show morning, afternoon, and evening separately.</span>
+        </div>
+        <label class="switch">
+          <input id="divideBlocksSetting" type="checkbox" />
+          <span class="slider"></span>
+        </label>
+      </div>
+      <div class="field" style="margin-bottom:0">
+        <label for="highEnergyBlock">High-energy block</label>
+        <select id="highEnergyBlock">
+          <option value="morning">Morning</option>
+          <option value="afternoon">Afternoon</option>
+          <option value="evening">Evening</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="settings-card">
+      <h3>Block times</h3>
+      <div class="settings-row">
+        <strong>Morning</strong>
+        <label>Start<input id="morningStart" type="time" /></label>
+        <label>End<input id="morningEnd" type="time" /></label>
+      </div>
+      <div class="settings-row">
+        <strong>Afternoon</strong>
+        <label>Start<input id="afternoonStart" type="time" /></label>
+        <label>End<input id="afternoonEnd" type="time" /></label>
+      </div>
+      <div class="settings-row">
+        <strong>Evening</strong>
+        <label>Start<input id="eveningStart" type="time" /></label>
+        <label>End<input id="eveningEnd" type="time" /></label>
+      </div>
+      <div class="hint">A block may still receive a task after it starts when the task fits in the time remaining before the block ends.</div>
+    </div>
+
+    <div class="settings-card">
+      <h3>Focus and break times</h3>
+      <div class="settings-row">
+        <strong style="color:#15803d">Want to</strong>
+        <label>Focus<input id="easyFocus" type="number" min="1" max="180" /></label>
+        <label>Break<input id="easyBreak" type="number" min="1" max="60" /></label>
+      </div>
+      <div class="settings-row">
+        <strong style="color:#a16207">Neutral</strong>
+        <label>Focus<input id="neutralFocus" type="number" min="1" max="180" /></label>
+        <label>Break<input id="neutralBreak" type="number" min="1" max="60" /></label>
+      </div>
+      <div class="settings-row">
+        <strong style="color:#b91c1c">Avoiding it</strong>
+        <label>Focus<input id="hardFocus" type="number" min="1" max="180" /></label>
+        <label>Break<input id="hardBreak" type="number" min="1" max="60" /></label>
+      </div>
+      <div class="hint">Times are in minutes.</div>
+    </div>
+
+    <div class="settings-card">
+      <h3>Timer style</h3>
+      <select id="timerStyle">
+        <option value="digital">Digital</option>
+        <option value="analog">Analog</option>
+      </select>
+    </div>
+
+    <div class="settings-card">
+      <h3>Timer sound</h3>
+      <div class="sound-choice-row">
+        <div class="field" style="margin:0">
+          <label for="timerSound">Sound at the end of focus and break</label>
+          <select id="timerSound">
+            <option value="gentle">Gentle chime</option>
+            <option value="bell">Clear bell</option>
+            <option value="digital">Digital beep</option>
+            <option value="wood">Wood block</option>
+            <option value="none">No sound</option>
+          </select>
+        </div>
+        <button class="btn btn-ghost sound-preview-btn" id="previewSoundBtn" type="button">Preview</button>
+      </div>
+      <div class="hint" style="margin-top:7px">Your browser may require one click before it allows sound.</div>
+    </div>
+
+    <div class="settings-card">
+      <h3>Theme color</h3>
+      <div class="theme-swatches" id="themeSwatches">
+        <button class="theme-swatch" data-theme="blue" style="background:#2563eb" title="Blue"></button>
+        <button class="theme-swatch" data-theme="aqua" style="background:#0891b2" title="Aqua"></button>
+        <button class="theme-swatch" data-theme="green" style="background:#16a34a" title="Green"></button>
+        <button class="theme-swatch" data-theme="yellow" style="background:#ca8a04" title="Yellow"></button>
+        <button class="theme-swatch" data-theme="orange" style="background:#ea580c" title="Orange"></button>
+        <button class="theme-swatch" data-theme="red" style="background:#dc2626" title="Red"></button>
+        <button class="theme-swatch" data-theme="purple" style="background:#7c3aed" title="Purple"></button>
+      </div>
+    </div>
+
+    <div class="settings-card">
+      <h3>Task management</h3>
+      <div class="settings-actions">
+        <button class="btn btn-ghost" id="loadDemoBtn">Load demo tasks</button>
+        <button class="btn btn-primary" id="generatePlanBtn">Generate plan</button>
+        <button class="btn btn-danger" id="clearTasksBtn">Clear all tasks</button>
+      </div>
+    </div>
+  </aside>
+
+  <div class="toast" id="toast"></div>
+  <div class="fatal-error hidden" id="fatalError">
+    <div class="fatal-error-card">
+      <h2>Task-it-up could not finish loading</h2>
+      <p id="fatalErrorMessage">Your saved browser data may be unavailable or damaged. You can reopen the app without deleting your task file.</p>
+      <div class="fatal-error-actions">
+        <button class="btn btn-primary" id="retryAppBtn" type="button">Try again</button>
+        <button class="btn btn-danger" id="resetAppBtn" type="button">Reset saved app data</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const TASKS_KEY="taskItUpTasksV3";
+    const SETTINGS_KEY="taskItUpSettingsV3";
+    const PROGRESS_KEY="taskItUpProgressV1";
+    const FOCUS_TASK_KEY="taskItUpFocusTaskSecondsV1";
+    const FOCUS_BLOCK_KEY="taskItUpFocusBlockSecondsV1";
+    const MANUAL_MOVES_KEY="taskItUpManualMovesV1";
+    const FOCUS_HISTORY_KEY="taskItUpFocusHistoryV1";
+    const OLD_TASKS_KEY="taskItUpTasksV2";
+    const OLD_SETTINGS_KEY="taskItUpSettingsV2";
+
+    const THEMES={
+      blue:{primary:"#2563eb",dark:"#1d4ed8",soft:"#dbeafe",rgb:"37,99,235",bg:"#f5f8ff"},
+      aqua:{primary:"#0891b2",dark:"#0e7490",soft:"#cffafe",rgb:"8,145,178",bg:"#f0fdff"},
+      green:{primary:"#16a34a",dark:"#15803d",soft:"#dcfce7",rgb:"22,163,74",bg:"#f3fcf6"},
+      yellow:{primary:"#ca8a04",dark:"#a16207",soft:"#fef9c3",rgb:"202,138,4",bg:"#fffdf2"},
+      orange:{primary:"#ea580c",dark:"#c2410c",soft:"#ffedd5",rgb:"234,88,12",bg:"#fff8f3"},
+      red:{primary:"#dc2626",dark:"#b91c1c",soft:"#fee2e2",rgb:"220,38,38",bg:"#fff6f6"},
+      purple:{primary:"#7c3aed",dark:"#6d28d9",soft:"#ede9fe",rgb:"124,58,237",bg:"#faf7ff"}
+    };
+
+    const defaultSettings={
+      divideBlocks:true,
+      highEnergyBlock:"morning",
+      blockTimes:{
+        morning:{start:"08:00",end:"12:00"},
+        afternoon:{start:"12:00",end:"16:00"},
+        evening:{start:"16:00",end:"20:00"}
+      },
+      timer:{
+        easy:{focus:40,break:5},
+        neutral:{focus:30,break:5},
+        difficult:{focus:20,break:5}
+      },
+      timerStyle:"digital",
+      timerSound:"gentle",
+      theme:"blue"
+    };
+
+    function mergeSettings(saved={}){
+      return {
+        ...defaultSettings,
+        ...saved,
+        blockTimes:{
+          morning:{...defaultSettings.blockTimes.morning,...(saved.blockTimes?.morning||{})},
+          afternoon:{...defaultSettings.blockTimes.afternoon,...(saved.blockTimes?.afternoon||{})},
+          evening:{...defaultSettings.blockTimes.evening,...(saved.blockTimes?.evening||{})}
+        },
+        timer:{
+          easy:{...defaultSettings.timer.easy,...(saved.timer?.easy||{})},
+          neutral:{...defaultSettings.timer.neutral,...(saved.timer?.neutral||{})},
+          difficult:{...defaultSettings.timer.difficult,...(saved.timer?.difficult||{})}
+        }
+      };
+    }
+
+    const fallbackStorage={};
+    function storageGet(key){
+      try{
+        if(typeof localStorage!=="undefined")return localStorage.getItem(key);
+      }catch(error){console.warn("Browser storage is unavailable; using temporary memory storage.",error);}
+      return Object.prototype.hasOwnProperty.call(fallbackStorage,key)?fallbackStorage[key]:null;
+    }
+    function storageSet(key,value){
+      fallbackStorage[key]=String(value);
+      try{
+        if(typeof localStorage!=="undefined")localStorage.setItem(key,String(value));
+      }catch(error){console.warn("Could not save to browser storage; this session will remain usable.",error);}
+    }
+    function storageRemove(key){
+      delete fallbackStorage[key];
+      try{
+        if(typeof localStorage!=="undefined")localStorage.removeItem(key);
+      }catch(error){console.warn("Could not remove browser storage.",error);}
+    }
+    function safeParse(raw,fallback){
+      if(raw===null||raw===undefined||raw==="")return fallback;
+      try{return JSON.parse(raw);}catch(error){console.warn("Ignoring damaged saved data.",error);return fallback;}
+    }
+    function plainObject(value,fallback={}){
+      return value&&typeof value==="object"&&!Array.isArray(value)?value:fallback;
+    }
+
+    const oldTasksValue=safeParse(storageGet(OLD_TASKS_KEY),[]);
+    const oldTasks=Array.isArray(oldTasksValue)?oldTasksValue:[];
+    const tasksValue=safeParse(storageGet(TASKS_KEY),oldTasks);
+    let tasks=Array.isArray(tasksValue)?tasksValue:oldTasks;
+    const oldSettings=plainObject(safeParse(storageGet(OLD_SETTINGS_KEY),{}));
+    const savedSettings=plainObject(safeParse(storageGet(SETTINGS_KEY),oldSettings));
+    let settings=mergeSettings(savedSettings);
+    const completedValue=safeParse(storageGet(PROGRESS_KEY),[]);
+    let completedPlanKeys=new Set(Array.isArray(completedValue)?completedValue:[]);
+    let focusTaskSeconds=plainObject(safeParse(storageGet(FOCUS_TASK_KEY),{}));
+    let focusBlockSeconds=plainObject(safeParse(storageGet(FOCUS_BLOCK_KEY),{}));
+    let manualMoves=plainObject(safeParse(storageGet(MANUAL_MOVES_KEY),{}));
+    const focusHistoryValue=safeParse(storageGet(FOCUS_HISTORY_KEY),[]);
+    let focusHistory=Array.isArray(focusHistoryValue)?focusHistoryValue.filter(entry=>entry&&entry.completedAt&&Number(entry.seconds)>0):[];
+
+    let masterPlan=[];
+    let weekOffset=0;
+    let activeTimer=null;
+    let timerTicker=null;
+    let audioContext=null;
+
+    const BLOCKS=["morning","afternoon","evening"];
+    const BLOCK_LABELS={morning:"Morning",afternoon:"Afternoon",evening:"Evening"};
+
+    const $=id=>document.getElementById(id);
+    const els={
+      taskForm:$("taskForm"),taskFormPanel:$("taskFormPanel"),editingId:$("editingId"),
+      taskName:$("taskName"),notes:$("notes"),amount:$("amount"),unit:$("unit"),
+      deadline:$("deadline"),deadlineBlock:$("deadlineBlock"),recurring:$("recurring"),
+      recurringFields:$("recurringFields"),frequency:$("frequency"),weekday:$("weekday"),
+      weekdayWrap:$("weekdayWrap"),repeatUntil:$("repeatUntil"),allAtOnce:$("allAtOnce"),
+      taskList:$("taskList"),searchInput:$("searchInput"),filterSelect:$("filterSelect"),
+      settingsDrawer:$("settingsDrawer"),drawerBackdrop:$("drawerBackdrop"),toast:$("toast"),
+      divideBlocksSetting:$("divideBlocksSetting"),highEnergyBlock:$("highEnergyBlock"),
+      scheduleGrid:$("scheduleGrid")
+    };
+
+    function persist(){
+      storageSet(TASKS_KEY,JSON.stringify(tasks));
+      storageSet(SETTINGS_KEY,JSON.stringify(settings));
+      storageSet(PROGRESS_KEY,JSON.stringify([...completedPlanKeys]));
+      storageSet(FOCUS_TASK_KEY,JSON.stringify(focusTaskSeconds));
+      storageSet(FOCUS_BLOCK_KEY,JSON.stringify(focusBlockSeconds));
+      storageSet(MANUAL_MOVES_KEY,JSON.stringify(manualMoves));
+      storageSet(FOCUS_HISTORY_KEY,JSON.stringify(focusHistory));
+    }
+
+    function uid(){
+      return globalThis.crypto&&typeof globalThis.crypto.randomUUID==="function"?globalThis.crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2);
+    }
+
+    function todayStart(){const d=new Date();d.setHours(0,0,0,0);return d}
+    function addDays(date,n){const d=new Date(date);d.setDate(d.getDate()+n);return d}
+    function dateKey(date){
+      return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}-${String(date.getDate()).padStart(2,"0")}`;
+    }
+    function parseDate(value){return value?new Date(value+"T12:00:00"):null}
+    function sameDay(a,b){return dateKey(a)===dateKey(b)}
+    function clamp(n,min,max){return Math.min(max,Math.max(min,n))}
+    function formatDate(date,options={month:"short",day:"numeric"}){return date.toLocaleDateString(undefined,options)}
+    function formatAmount(n){return Number.isInteger(n)?String(n):String(Math.round(n*100)/100)}
+    function escapeHtml(value){
+      return String(value??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[ch]));
+    }
+
+    function showToast(message){
+      els.toast.textContent=message;
+      els.toast.classList.add("show");
+      clearTimeout(showToast.timer);
+      showToast.timer=setTimeout(()=>els.toast.classList.remove("show"),1900);
+    }
+
+    function applyTheme(){
+      const t=THEMES[settings.theme]||THEMES.blue;
+      const root=document.documentElement.style;
+      root.setProperty("--primary",t.primary);
+      root.setProperty("--primary-dark",t.dark);
+      root.setProperty("--primary-soft",t.soft);
+      root.setProperty("--primary-rgb",t.rgb);
+      root.setProperty("--bg",t.bg);
+      document.querySelectorAll(".theme-swatch").forEach(btn=>{
+        btn.classList.toggle("active",btn.dataset.theme===settings.theme);
+      });
+    }
+
+    function difficultyKey(task){
+      return Number(task.motivation)===3?"difficult":Number(task.motivation)===2?"neutral":"easy";
+    }
+    function difficultyText(task){
+      const key=difficultyKey(task);
+      return key==="difficult"?"Avoiding it":key==="neutral"?"Neutral":"Want to";
+    }
+    function effortWeight(task,amount=task.amount){
+      const n=Number(amount)||0;
+      if(task.unit==="minutes")return n/60;
+      if(task.unit==="hours")return n;
+      return Math.max(.35,n*.5);
+    }
+    function taskTargetMinutes(task){
+      const amount=Number(task.amount)||0;
+      if(task.unit==="hours")return amount*60;
+      if(task.unit==="minutes")return amount;
+      return null;
+    }
+    function itemDurationMinutes(task,amount=task.amount){
+      const n=Number(amount)||0;
+      if(task.unit==="hours")return n*60;
+      if(task.unit==="minutes")return n;
+      return effortWeight(task,n)*60;
+    }
+    function formatDurationMinutes(minutes){
+      const rounded=Math.max(0,Math.round(Number(minutes)||0));
+      const hours=Math.floor(rounded/60);
+      const mins=rounded%60;
+      if(hours&&mins)return `${hours}h ${mins}m`;
+      if(hours)return `${hours}h`;
+      return `${mins}m`;
+    }
+    function taskTimeProgress(task){
+      const loggedSeconds=Number(focusTaskSeconds[task.id]||0);
+      const loggedMinutes=loggedSeconds/60;
+      const targetMinutes=taskTargetMinutes(task);
+      const percent=targetMinutes?Math.min(100,Math.round(loggedMinutes/targetMinutes*100)):0;
+      const overMinutes=targetMinutes?Math.max(0,loggedMinutes-targetMinutes):0;
+      let text=targetMinutes
+        ? `${formatDurationMinutes(loggedMinutes)} of ${formatDurationMinutes(targetMinutes)}`
+        : `${formatDurationMinutes(loggedMinutes)} focused`;
+      if(overMinutes>0)text+=` (+${formatDurationMinutes(overMinutes)})`;
+      return {loggedSeconds,loggedMinutes,targetMinutes,percent,overMinutes,text};
+    }
+    function itemTimeProgress(item){
+      const loggedMinutes=Number(focusBlockSeconds[item.progressKey]||0)/60;
+      const targetMinutes=itemDurationMinutes(item.task,item.amount);
+      const percent=targetMinutes?Math.min(100,Math.round(loggedMinutes/targetMinutes*100)):0;
+      return {loggedMinutes,targetMinutes,percent};
+    }
+
+    function desiredChunks(task){
+      const amount=Number(task.amount)||1;
+      if(task.allAtOnce)return 1;
+      if(task.unit==="minutes")return Math.max(1,Math.ceil(amount/30));
+      if(task.unit==="hours")return Math.max(1,Math.ceil(amount));
+      return Math.max(1,Math.ceil(amount));
+    }
+
+    function timeToMinutes(value){
+      const [h,m]=(value||"00:00").split(":").map(Number);
+      return h*60+m;
+    }
+    function minutesNow(){
+      const d=new Date();
+      return d.getHours()*60+d.getMinutes();
+    }
+    function blockTimeState(dayIndex,block){
+      if(dayIndex>0)return "future";
+      const now=minutesNow();
+      const start=timeToMinutes(settings.blockTimes[block].start);
+      const end=timeToMinutes(settings.blockTimes[block].end);
+      if(now<start)return "future";
+      if(now>=end)return "ended";
+      return "active";
+    }
+    function blockStarted(dayIndex,block){
+      return blockTimeState(dayIndex,block)==="active";
+    }
+    function blockBaseMinutes(dayIndex,block){
+      const start=timeToMinutes(settings.blockTimes[block].start);
+      const end=timeToMinutes(settings.blockTimes[block].end);
+      if(dayIndex>0)return Math.max(0,end-start);
+      const now=minutesNow();
+      if(now>=end)return 0;
+      return Math.max(0,end-Math.max(now,start));
+    }
+    function blockLabelTime(block){
+      const t=settings.blockTimes[block];
+      return `${formatClockTime(t.start)}–${formatClockTime(t.end)}`;
+    }
+    function formatClockTime(value){
+      const [h,m]=value.split(":").map(Number);
+      const d=new Date();d.setHours(h,m,0,0);
+      return d.toLocaleTimeString(undefined,{hour:"numeric",minute:m?"2-digit":undefined});
+    }
+    function usedBlockMinutes(day,block,excludeItemId=null){
+      const items=block==="day"?day.items:day.blocks[block];
+      return items
+        .filter(item=>item.id!==excludeItemId&&!isItemDone(item))
+        .reduce((sum,item)=>sum+itemDurationMinutes(item.task,item.amount),0);
+    }
+    function blockRemainingMinutes(dayIndex,block,excludeItemId=null){
+      const day=masterPlan[dayIndex];
+      if(!day)return 0;
+      if(block==="day"){
+        return BLOCKS.reduce((sum,b)=>sum+blockBaseMinutes(dayIndex,b),0)-usedBlockMinutes(day,"day",excludeItemId);
+      }
+      return Math.max(0,blockBaseMinutes(dayIndex,block)-usedBlockMinutes(day,block,excludeItemId));
+    }
+    function dayAvailable(dayIndex,task=null,amount=null){
+      if(!settings.divideBlocks)return blockRemainingMinutes(dayIndex,"day")>0;
+      if(!task)return BLOCKS.some(block=>blockRemainingMinutes(dayIndex,block)>0);
+      return availableBlocks(dayIndex,task,false,amount??task.amount).length>0;
+    }
+    function availableBlocks(dayIndex,task,isDueDay=false,amount=task.amount,excludeItemId=null){
+      const needed=itemDurationMinutes(task,amount);
+      if(!settings.divideBlocks){
+        return blockRemainingMinutes(dayIndex,"day",excludeItemId)>=needed?["day"]:[];
+      }
+      let blocks=BLOCKS.filter(block=>blockRemainingMinutes(dayIndex,block,excludeItemId)>=needed);
+      if(isDueDay&&task.deadlineBlock){
+        const deadlineIndex=BLOCKS.indexOf(task.deadlineBlock);
+        blocks=blocks.filter(block=>BLOCKS.indexOf(block)<deadlineIndex);
+      }
+      if(difficultyKey(task)==="difficult"&&blocks.includes(settings.highEnergyBlock)){
+        blocks=[settings.highEnergyBlock,...blocks.filter(b=>b!==settings.highEnergyBlock)];
+      }
+      return blocks;
+    }
+
+    function createDay(date,index){
+      return {
+        date,index,load:0,items:[],
+        blocks:{morning:[],afternoon:[],evening:[]}
+      };
+    }
+
+    function blockLoad(day,block){
+      if(block==="day")return day.load;
+      return day.blocks[block].reduce((sum,item)=>sum+item.weight,0);
+    }
+
+    function chooseSlot(dayIndices,task,dueDate=null,afterBlock=null,amount=task.amount,excludeItemId=null){
+      let best=null;
+      for(const dayIndex of dayIndices){
+        if(dayIndex<0||dayIndex>=masterPlan.length)continue;
+        const day=masterPlan[dayIndex];
+        const dueDay=dueDate?sameDay(day.date,dueDate):false;
+        let blocks=availableBlocks(dayIndex,task,dueDay,amount,excludeItemId);
+
+        if(settings.divideBlocks&&afterBlock&&dayIndex===afterBlock.dayIndex){
+          blocks=blocks.filter(block=>BLOCKS.indexOf(block)>BLOCKS.indexOf(afterBlock.block));
+        }
+
+        for(const block of blocks){
+          const remaining=blockRemainingMinutes(dayIndex,block,excludeItemId);
+          const capacity=Math.max(1,blockBaseMinutes(dayIndex,block));
+          const utilization=1-remaining/capacity;
+          let score=day.load+blockLoad(day,block)*.8+utilization+dayIndex*.006;
+          if(difficultyKey(task)==="difficult"&&block===settings.highEnergyBlock)score-=.45;
+          if(dueDay&&task.deadlineBlock)score-=.08;
+          if(!best||score<best.score)best={dayIndex,block,score};
+        }
+      }
+      return best;
+    }
+
+    function addScheduledItem(slot,task,amount,label,instanceId,dueDate=null){
+      if(!slot)return false;
+      const item={
+        id:`${instanceId}-${slot.dayIndex}-${slot.block}-${label}`,
+        progressKey:`${instanceId}|${label}`,
+        instanceId,task,amount,label,block:slot.block,dueDate,
+        weight:effortWeight(task,amount)
+      };
+      const day=masterPlan[slot.dayIndex];
+      day.items.push(item);
+      day.load+=item.weight;
+      if(settings.divideBlocks)day.blocks[slot.block].push(item);
+      return true;
+    }
+
+    function scheduleInstance(task,windowStart,dueDate,instanceId){
+      const first=clamp(Math.floor((windowStart-todayStart())/86400000),0,masterPlan.length-1);
+      const last=clamp(Math.floor((dueDate-todayStart())/86400000),0,masterPlan.length-1);
+      if(last<0||first>=masterPlan.length)return;
+
+      const total=Number(task.amount)||1;
+      const requestedChunks=task.allAtOnce?1:desiredChunks(task);
+      const chunks=Math.max(1,requestedChunks);
+      const amounts=[];
+      let remaining=total;
+      for(let i=0;i<chunks;i++){
+        const amount=i===chunks-1?remaining:Math.round((total/chunks)*100)/100;
+        amounts.push(Math.min(amount,remaining));
+        remaining=Math.round((remaining-amounts[i])*100)/100;
+      }
+
+      const dayIndices=[];
+      for(let i=first;i<=last;i++)dayIndices.push(i);
+
+      amounts.forEach((amount,i)=>{
+        const slot=chooseSlot(dayIndices,task,dueDate,null,amount);
+        if(!slot)return;
+        const label=task.allAtOnce?"Single block":chunks===1?"Task block":`Part ${i+1} of ${chunks}`;
+        addScheduledItem(slot,task,amount,label,instanceId,dueDate);
+      });
+    }
+
+    function recurringDueDates(task,horizonEnd){
+      const dates=[];
+      const start=todayStart();
+      const until=task.repeatUntil?parseDate(task.repeatUntil):horizonEnd;
+      const end=until<horizonEnd?until:horizonEnd;
+
+      if(task.frequency==="daily"){
+        for(let d=new Date(start);d<=end;d=addDays(d,1))dates.push(d);
+      }else if(task.frequency==="weekly"){
+        for(let d=new Date(start);d<=end;d=addDays(d,1)){
+          if(d.getDay()===Number(task.weekday))dates.push(d);
+        }
+      }else{
+        const targetDay=task.deadline?parseDate(task.deadline).getDate():start.getDate();
+        for(let d=new Date(start.getFullYear(),start.getMonth(),1);d<=end;d=new Date(d.getFullYear(),d.getMonth()+1,1)){
+          const lastDay=new Date(d.getFullYear(),d.getMonth()+1,0).getDate();
+          const due=new Date(d.getFullYear(),d.getMonth(),Math.min(targetDay,lastDay));
+          due.setHours(0,0,0,0);
+          if(due>=start&&due<=end)dates.push(due);
+        }
+      }
+      return dates;
+    }
+
+    function buildMasterPlan(){
+      const horizonDays=Math.max(90,(weekOffset+2)*7);
+      const start=todayStart();
+      masterPlan=Array.from({length:horizonDays},(_,i)=>createDay(addDays(start,i),i));
+      const horizonEnd=masterPlan[masterPlan.length-1].date;
+
+      const active=tasks.filter(task=>!task.completed);
+
+      active.filter(task=>task.recurring).forEach(task=>{
+        const dueDates=recurringDueDates(task,horizonEnd);
+        dueDates.forEach((due,index)=>{
+          const windowDays=task.frequency==="daily"?0:task.frequency==="weekly"?6:27;
+          const windowStart=new Date(Math.max(start.getTime(),addDays(due,-windowDays).getTime()));
+          scheduleInstance(task,windowStart,due,`${task.id}-rec-${dateKey(due)}-${index}`);
+        });
+      });
+
+      active.filter(task=>!task.recurring&&task.deadline).forEach(task=>{
+        let due=parseDate(task.deadline);
+        if(due<start)due=start;
+        scheduleInstance(task,start,due,`${task.id}-once`);
+      });
+
+      active.filter(task=>!task.recurring&&!task.deadline).forEach(task=>{
+        const due=addDays(start,13);
+        scheduleInstance(task,start,due,`${task.id}-flex`);
+      });
+
+      applyManualMoves();
+      renderPlan();
+    }
+
+    function currentViewDays(){
+      const start=weekOffset*7;
+      return masterPlan.slice(start,start+7);
+    }
+
+    function isItemDone(item){
+      return completedPlanKeys.has(item.progressKey);
+    }
+
+    function visiblePlanItems(){
+      return currentViewDays().flatMap(day=>day.items);
+    }
+
+    function taskProgress(task){
+      const sourceDays=task.recurring?currentViewDays():masterPlan;
+      const items=sourceDays.flatMap(day=>day.items).filter(item=>item.task.id===task.id);
+      const total=items.reduce((sum,item)=>sum+Number(item.amount),0);
+      const done=items.filter(isItemDone).reduce((sum,item)=>sum+Number(item.amount),0);
+      const totalBlocks=items.length;
+      const doneBlocks=items.filter(isItemDone).length;
+      const blockPercent=totalBlocks?Math.round(doneBlocks/totalBlocks*100):(task.completed?100:0);
+      const timed=taskTimeProgress(task);
+      const percent=timed.targetMinutes?timed.percent:blockPercent;
+      return {total,done,totalBlocks,doneBlocks,percent,blockPercent,timed,label:task.recurring?"this week":"total"};
+    }
+
+    function togglePlanItemDone(progressKey){
+      if(completedPlanKeys.has(progressKey))completedPlanKeys.delete(progressKey);
+      else completedPlanKeys.add(progressKey);
+      persist();
+      renderPlan();renderStats();renderTasks();renderProgress();renderTimer();
+      showToast(completedPlanKeys.has(progressKey)?"Work block marked done":"Work block reopened");
+    }
+
+    function planItemHtml(item){
+      const d=difficultyKey(item.task);
+      const done=isItemDone(item);
+      const taskTimed=taskTimeProgress(item.task);
+      const blockTimed=itemTimeProgress(item);
+      const shownPercent=taskTimed.targetMinutes?taskTimed.percent:blockTimed.percent;
+      const targetText=taskTimed.targetMinutes
+        ? `${taskTimed.text}`
+        : `${formatDurationMinutes(blockTimed.loggedMinutes)} of ${formatDurationMinutes(blockTimed.targetMinutes)} focus estimate`;
+      return `
+        <div class="plan-item ${d} ${done?"done":""}" draggable="true"
+          ondragstart="startPlanDrag(event,'${item.progressKey}')" ondragend="endPlanDrag(event)"
+          title="Drag this task block to another day or time block">
+          <div class="plan-item-title">${escapeHtml(item.task.name)}</div>
+          <div class="plan-item-row">
+            <div class="plan-item-meta">${formatAmount(item.amount)} ${escapeHtml(item.task.unit)} · ${escapeHtml(item.label)}</div>
+            <div class="plan-item-actions">
+              <button class="complete-block-btn ${done?"undo":""}" onclick="togglePlanItemDone('${item.progressKey}')">${done?"Undo":"Mark done"}</button>
+              <button class="start-timer-btn" onclick="startTaskTimer('${item.id}')">Start timer</button>
+            </div>
+          </div>
+          <div class="time-progress">
+            <div class="time-progress-copy"><span>Task time: ${targetText}</span><strong class="${taskTimed.overMinutes?"time-overage":""}">${shownPercent}%</strong></div>
+            <div class="time-progress-track"><div class="time-progress-fill ${taskTimed.overMinutes?"over":""}" style="width:${shownPercent}%"></div></div>
+            <div class="drag-hint">Drag to move · This block: ${formatDurationMinutes(blockTimed.loggedMinutes)} of ${formatDurationMinutes(blockTimed.targetMinutes)}</div>
+          </div>
+        </div>`;
+    }
+
+    function renderPlan(){
+      if(!masterPlan.length)return;
+      const days=currentViewDays();
+      const maxLoad=Math.max(1,...days.map(day=>day.load));
+      const start=days[0]?.date||todayStart();
+      const end=days[days.length-1]?.date||addDays(start,6);
+
+      $("weekRange").innerHTML=`${formatDate(start,{month:"short",day:"numeric"})} – ${formatDate(end,{month:"short",day:"numeric",year:"numeric"})}<small>${weekOffset===0?"Current seven-day plan":`Following week ${weekOffset}`}</small>`;
+      $("prevWeekBtn").disabled=weekOffset===0;
+
+      $("planSubtitle").textContent=settings.divideBlocks
+        ? `Tasks use remaining time inside each block. A block that has started can still accept work that fits before it ends.`
+        : "Tasks are balanced across the next seven days using the time still available today.";
+
+      $("footerNote").textContent=settings.divideBlocks
+        ? "Drag a task card to another day or time block. Morning, afternoon, and evening times can be changed in Settings."
+        : "Drag a task card to another day. Use Redistribute when a day cannot be completed.";
+
+      els.scheduleGrid.innerHTML=days.map(day=>{
+        const globalIndex=day.index;
+        const percent=Math.round(day.load/maxLoad*100);
+        const isToday=globalIndex===0;
+        let body="";
+
+        if(settings.divideBlocks){
+          body=BLOCKS.map(block=>{
+            const state=blockTimeState(globalIndex,block);
+            const items=day.blocks[block];
+            const remaining=blockRemainingMinutes(globalIndex,block);
+            const statusText=state==="ended"?"Ended":state==="active"?`${formatDurationMinutes(remaining)} left`:blockLabelTime(block);
+            const statusClass=state==="ended"?"closed":"";
+            return `
+              <div class="block-bin">
+                <div class="block-head">
+                  <div>
+                    <span class="block-title">${BLOCK_LABELS[block]}</span>
+                    <span class="block-status ${statusClass}">${statusText}</span>
+                    <div class="block-meta">${items.filter(isItemDone).length}/${items.length} done · ${formatDurationMinutes(remaining)} open</div>
+                  </div>
+                  <button class="redistribute-btn" onclick="redistributeBlock(${globalIndex},'${block}')">Redistribute</button>
+                </div>
+                <div class="block-body" data-day-index="${globalIndex}" data-block="${block}"
+                  ondragover="allowPlanDrop(event)" ondragenter="highlightPlanDrop(event)" ondragleave="unhighlightPlanDrop(event)"
+                  ondrop="dropPlanItem(event,${globalIndex},'${block}')">
+                  ${items.length?items.map(planItemHtml).join(""):`<div class="empty-slot">${state==="ended"?"Block ended":`${formatDurationMinutes(remaining)} available`}</div>`}
+                </div>
+              </div>`;
+          }).join("");
+        }else{
+          const remaining=blockRemainingMinutes(globalIndex,"day");
+          body=`
+            <div class="block-bin">
+              <div class="block-head">
+                <div>
+                  <span class="block-title">Daily tasks</span>
+                  <div class="block-meta">${day.items.filter(isItemDone).length}/${day.items.length} done · ${formatDurationMinutes(remaining)} open</div>
+                </div>
+                <button class="redistribute-btn" onclick="redistributeBlock(${globalIndex},null)">Redistribute</button>
+              </div>
+              <div class="block-body" data-day-index="${globalIndex}" data-block="day"
+                ondragover="allowPlanDrop(event)" ondragenter="highlightPlanDrop(event)" ondragleave="unhighlightPlanDrop(event)"
+                ondrop="dropPlanItem(event,${globalIndex},'day')">
+                ${day.items.length?day.items.map(planItemHtml).join(""):`<div class="empty-slot">${formatDurationMinutes(remaining)} available</div>`}
+              </div>
+            </div>`;
+        }
+
+        return `
+          <article class="day-card">
+            <div class="day-head">
+              <div>
+                <strong>${isToday?"Today":formatDate(day.date,{weekday:"long"})}</strong>
+                <span>${formatDate(day.date,{month:"long",day:"numeric",year:"numeric"})}</span>
+                <div class="day-load"><div style="width:${percent}%"></div></div>
+              </div>
+              <div class="block-meta">${day.load.toFixed(1)} total effort</div>
+            </div>
+            <div class="day-body">${body}</div>
+          </article>`;
+      }).join("");
+    }
+
+    function removeItemFromDay(day,item){
+      day.items=day.items.filter(x=>x.id!==item.id);
+      if(settings.divideBlocks&&item.block&&day.blocks[item.block]){
+        day.blocks[item.block]=day.blocks[item.block].filter(x=>x.id!==item.id);
+      }
+      day.load=Math.max(0,day.load-item.weight);
+    }
+
+    function findPlanItem(progressKey){
+      for(const day of masterPlan){
+        const item=day.items.find(candidate=>candidate.progressKey===progressKey);
+        if(item)return {day,item};
+      }
+      return null;
+    }
+    function canMoveItem(item,targetDayIndex,targetBlock){
+      const targetDay=masterPlan[targetDayIndex];
+      if(!targetDay)return {ok:false,message:"That day is unavailable."};
+      const deadline=item.dueDate||parseDate(item.task.deadline);
+      if(deadline&&targetDay.date>deadline)return {ok:false,message:"That move would place the task after its deadline."};
+      const dueDay=deadline?sameDay(targetDay.date,deadline):false;
+      const allowed=availableBlocks(targetDayIndex,item.task,dueDay,item.amount,item.id);
+      if(!allowed.includes(targetBlock)){
+        return {ok:false,message:`This task needs ${formatDurationMinutes(itemDurationMinutes(item.task,item.amount))}, but that block does not have enough time remaining.`};
+      }
+      return {ok:true};
+    }
+    function movePlanItem(progressKey,targetDayIndex,targetBlock,{remember=true,render=true,notify=true}={}){
+      const located=findPlanItem(progressKey);
+      if(!located)return false;
+      const {day:source,item}=located;
+      if(!settings.divideBlocks)targetBlock="day";
+      const check=canMoveItem(item,targetDayIndex,targetBlock);
+      if(!check.ok){if(notify)showToast(check.message);return false;}
+      removeItemFromDay(source,item);
+      const target=masterPlan[targetDayIndex];
+      item.block=targetBlock;
+      target.items.push(item);
+      target.load+=item.weight;
+      if(settings.divideBlocks)target.blocks[targetBlock].push(item);
+      if(remember){
+        manualMoves[progressKey]={date:dateKey(target.date),block:targetBlock};
+        persist();
+      }
+      if(render){renderPlan();renderStats();renderTasks();}
+      if(notify)showToast(`Moved to ${formatDate(target.date,{weekday:"short",month:"short",day:"numeric"})}${settings.divideBlocks?` · ${BLOCK_LABELS[targetBlock]}`:""}`);
+      return true;
+    }
+    function applyManualMoves(){
+      Object.entries(manualMoves).forEach(([progressKey,target])=>{
+        const index=masterPlan.findIndex(day=>dateKey(day.date)===target.date);
+        if(index<0)return;
+        const block=settings.divideBlocks?(BLOCKS.includes(target.block)?target.block:"morning"):"day";
+        movePlanItem(progressKey,index,block,{remember:false,render:false,notify:false});
+      });
+    }
+    function startPlanDrag(event,progressKey){
+      event.dataTransfer.setData("text/plain",progressKey);
+      event.dataTransfer.effectAllowed="move";
+      event.currentTarget.classList.add("dragging");
+    }
+    function endPlanDrag(event){
+      event.currentTarget.classList.remove("dragging");
+      document.querySelectorAll(".block-body.drag-over").forEach(el=>el.classList.remove("drag-over"));
+    }
+    function allowPlanDrop(event){event.preventDefault();event.dataTransfer.dropEffect="move";}
+    function highlightPlanDrop(event){event.preventDefault();event.currentTarget.classList.add("drag-over");}
+    function unhighlightPlanDrop(event){
+      if(!event.currentTarget.contains(event.relatedTarget))event.currentTarget.classList.remove("drag-over");
+    }
+    function dropPlanItem(event,dayIndex,block){
+      event.preventDefault();
+      event.currentTarget.classList.remove("drag-over");
+      const progressKey=event.dataTransfer.getData("text/plain");
+      if(progressKey)movePlanItem(progressKey,dayIndex,block);
+    }
+
+    function redistributeBlock(dayIndex,block){
+      const source=masterPlan[dayIndex];
+      if(!source)return;
+      const moving=settings.divideBlocks&&block?[...source.blocks[block]]:[...source.items];
+      if(!moving.length){showToast("Nothing to redistribute");return}
+
+      moving.forEach(item=>removeItemFromDay(source,item));
+
+      let missedDeadline=false;
+      moving.forEach(item=>{
+        const deadline=item.dueDate||parseDate(item.task.deadline)||masterPlan[masterPlan.length-1].date;
+        let latest=clamp(Math.floor((deadline-todayStart())/86400000),dayIndex,masterPlan.length-1);
+        const candidates=[];
+
+        if(settings.divideBlocks&&block){
+          const sameDayBlocks=availableBlocks(dayIndex,item.task,false).filter(b=>BLOCKS.indexOf(b)>BLOCKS.indexOf(block));
+          if(sameDayBlocks.length)candidates.push(dayIndex);
+        }
+        for(let i=dayIndex+1;i<=latest;i++)candidates.push(i);
+
+        let slot=chooseSlot([...new Set(candidates)],item.task,deadline,{dayIndex,block},item.amount,item.id);
+        if(!slot){
+          const later=[];
+          for(let i=dayIndex+1;i<masterPlan.length;i++)later.push(i);
+          slot=chooseSlot(later,item.task,null,{dayIndex,block},item.amount,item.id);
+          missedDeadline=true;
+        }
+        if(slot){
+          item.block=slot.block;
+          const target=masterPlan[slot.dayIndex];
+          target.items.push(item);
+          target.load+=item.weight;
+          if(settings.divideBlocks)target.blocks[slot.block].push(item);
+        }
+      });
+
+      renderPlan();
+      showToast(missedDeadline?"Redistributed; one or more tasks may pass their deadline":"Unfinished work redistributed");
+    }
+
+    function timerPreset(task){
+      return settings.timer[difficultyKey(task)];
+    }
+
+    function ensureAudioContext(){
+      if(!audioContext){
+        const AudioCtx=window.AudioContext||window.webkitAudioContext;
+        if(AudioCtx)audioContext=new AudioCtx();
+      }
+      if(audioContext&&audioContext.state==="suspended")audioContext.resume();
+      return audioContext;
+    }
+
+    function tone(frequency,start,duration,type="sine",gain=.12){
+      const ctx=ensureAudioContext();
+      if(!ctx)return;
+      const osc=ctx.createOscillator();
+      const volume=ctx.createGain();
+      osc.type=type;osc.frequency.setValueAtTime(frequency,ctx.currentTime+start);
+      volume.gain.setValueAtTime(.0001,ctx.currentTime+start);
+      volume.gain.exponentialRampToValueAtTime(gain,ctx.currentTime+start+.015);
+      volume.gain.exponentialRampToValueAtTime(.0001,ctx.currentTime+start+duration);
+      osc.connect(volume);volume.connect(ctx.destination);
+      osc.start(ctx.currentTime+start);osc.stop(ctx.currentTime+start+duration+.03);
+    }
+
+    function playTimerSound(name=settings.timerSound){
+      if(name==="none")return;
+      ensureAudioContext();
+      if(name==="gentle"){tone(523.25,0,.45,"sine",.1);tone(659.25,.18,.5,"sine",.09);tone(783.99,.36,.65,"sine",.08);}
+      else if(name==="bell"){tone(880,0,.75,"sine",.14);tone(1320,.02,.55,"sine",.05);}
+      else if(name==="digital"){tone(740,0,.16,"square",.07);tone(740,.24,.16,"square",.07);tone(988,.48,.22,"square",.07);}
+      else if(name==="wood"){tone(220,0,.11,"triangle",.15);tone(165,.16,.12,"triangle",.12);}
+    }
+
+    function recordFocusSession(timer){
+      const seconds=Number(timer.focusSeconds)||0;
+      const taskId=timer.item.task.id;
+      focusTaskSeconds[taskId]=Number(focusTaskSeconds[taskId]||0)+seconds;
+      focusBlockSeconds[timer.item.progressKey]=Number(focusBlockSeconds[timer.item.progressKey]||0)+seconds;
+      focusHistory.push({
+        id:uid(),
+        taskId,
+        taskName:timer.item.task.name,
+        difficulty:difficultyKey(timer.item.task),
+        seconds,
+        completedAt:new Date().toISOString()
+      });
+      if(focusHistory.length>1000)focusHistory=focusHistory.slice(-1000);
+      const blockTarget=itemDurationMinutes(timer.item.task,timer.item.amount)*60;
+      if(Number(focusBlockSeconds[timer.item.progressKey]||0)>=blockTarget){
+        completedPlanKeys.add(timer.item.progressKey);
+      }
+      persist();
+      renderPlan();renderStats();renderTasks();
+    }
+
+    function startTaskTimer(itemId){
+      ensureAudioContext();
+      const item=masterPlan.flatMap(day=>day.items).find(x=>x.id===itemId);
+      if(!item)return;
+      const preset=timerPreset(item.task);
+      activeTimer={
+        item,
+        phase:"focus",
+        focusSeconds:Number(preset.focus)*60,
+        breakSeconds:Number(preset.break)*60,
+        remaining:Number(preset.focus)*60,
+        running:true
+      };
+      switchView("timerView");
+      startTimerTicker();
+      renderTimer();
+    }
+
+    function startTimerTicker(){
+      if(timerTicker)return;
+      timerTicker=setInterval(()=>{
+        if(!activeTimer||!activeTimer.running)return;
+        activeTimer.remaining-=1;
+        if(activeTimer.remaining<=0){
+          if(activeTimer.phase==="focus"){
+            recordFocusSession(activeTimer);
+            playTimerSound();
+            activeTimer.phase="break";
+            activeTimer.remaining=activeTimer.breakSeconds;
+            showToast("Focus complete — break started");
+          }else{
+            playTimerSound();
+            activeTimer.phase="focus";
+            activeTimer.remaining=activeTimer.focusSeconds;
+            activeTimer.running=false;
+            showToast("Break complete");
+          }
+        }
+        renderTimer();
+      },1000);
+    }
+
+    function formatSeconds(seconds){
+      const m=Math.floor(Math.max(0,seconds)/60);
+      const s=Math.max(0,seconds)%60;
+      return `${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+    }
+
+    function renderTimer(){
+      const empty=$("timerEmpty"),active=$("timerActive");
+      if(!activeTimer){
+        empty.classList.remove("hidden");
+        active.classList.add("hidden");
+        const miniButton=$("miniTimerButton");
+        if(miniButton)miniButton.classList.add("hidden");
+        return;
+      }
+      empty.classList.add("hidden");active.classList.remove("hidden");
+      const total=activeTimer.phase==="focus"?activeTimer.focusSeconds:activeTimer.breakSeconds;
+      const elapsed=total-activeTimer.remaining;
+      const progress=clamp(elapsed/Math.max(1,total),0,1);
+
+      $("timerPhase").textContent=activeTimer.phase==="focus"?"Focus":"Break";
+      $("timerTaskName").textContent=activeTimer.item.task.name;
+      const preset=timerPreset(activeTimer.item.task);
+      const timed=taskTimeProgress(activeTimer.item.task);
+      const timerProgressText=timed.targetMinutes?`${timed.text} logged`:timed.text;
+      $("timerTaskMeta").textContent=`${preset.focus}-minute focus · ${preset.break}-minute break · ${difficultyText(activeTimer.item.task)} · ${timerProgressText}`;
+      $("digitalTimer").textContent=formatSeconds(activeTimer.remaining);
+      $("analogCenter").textContent=formatSeconds(activeTimer.remaining);
+      $("analogClock").style.setProperty("--progress",`${progress*360}deg`);
+      $("analogClock").style.setProperty("--hand",`${progress*360}deg`);
+      $("timerStartPauseBtn").textContent=activeTimer.running?"Pause":"Start";
+      $("timerCompleteBtn").textContent=isItemDone(activeTimer.item)?"Undo completed block":"Mark block done";
+
+      const miniButton=$("miniTimerButton");
+      if(miniButton){
+        miniButton.classList.toggle("hidden",!activeTimer.running);
+        $("miniTimerPhase").textContent=activeTimer.phase==="focus"?"Focus":"Break";
+        $("miniTimerDisplay").textContent=formatSeconds(activeTimer.remaining);
+      }
+
+      const analog=settings.timerStyle==="analog";
+      $("digitalTimer").classList.toggle("hidden",analog);
+      $("analogTimer").classList.toggle("hidden",!analog);
+    }
+
+    function resetTimer(){
+      if(!activeTimer)return;
+      activeTimer.phase="focus";
+      activeTimer.remaining=activeTimer.focusSeconds;
+      activeTimer.running=false;
+      renderTimer();
+    }
+
+    function switchView(viewId){
+      document.querySelectorAll(".view").forEach(view=>view.classList.toggle("active",view.id===viewId));
+      document.querySelectorAll(".main-tab").forEach(tab=>tab.classList.toggle("active",tab.dataset.view===viewId));
+      if(viewId==="timerView")renderTimer();
+      if(viewId==="progressView")renderProgress();
+      window.scrollTo({top:0,behavior:"smooth"});
+    }
+
+    function openTaskForm(editing=false){
+      switchView("planView");
+      els.taskFormPanel.classList.remove("hidden");
+      if(!editing)resetTaskForm(false);
+      els.taskFormPanel.scrollIntoView({behavior:"smooth",block:"start"});
+    }
+
+    function closeTaskForm(){
+      els.taskFormPanel.classList.add("hidden");
+      resetTaskForm(false);
+    }
+
+    function resetTaskForm(close=false){
+      els.taskForm.reset();
+      $("difficultyNeutral").checked=true;
+      els.amount.value=1;
+      els.unit.value="hours";
+      els.editingId.value="";
+      $("formTitle").textContent="Add a task";
+      $("saveTaskBtn").textContent="Add task";
+      $("cancelEditBtn").classList.add("hidden");
+      els.recurringFields.classList.add("hidden");
+      els.weekdayWrap.classList.remove("hidden");
+      if(close)els.taskFormPanel.classList.add("hidden");
+    }
+
+    function renderTasks(){
+      const q=els.searchInput.value.trim().toLowerCase();
+      const filter=els.filterSelect.value;
+      const filtered=tasks.filter(task=>{
+        const matches=!q||task.name.toLowerCase().includes(q)||(task.notes||"").toLowerCase().includes(q);
+        const category=filter==="all"||
+          (filter==="deadline"&&task.deadline)||
+          (filter==="nodeadline"&&!task.deadline)||
+          (filter==="recurring"&&task.recurring)||
+          (filter==="difficult"&&Number(task.motivation)===3);
+        return matches&&category;
+      }).sort((a,b)=>{
+        if(Boolean(a.completed)!==Boolean(b.completed))return a.completed?1:-1;
+        if(a.deadline&&b.deadline)return a.deadline.localeCompare(b.deadline);
+        if(a.deadline)return -1;if(b.deadline)return 1;
+        return Number(b.motivation)-Number(a.motivation);
+      });
+
+      $("taskCountLabel").textContent=`${filtered.length} task${filtered.length===1?"":"s"}`;
+      if(!filtered.length){
+        els.taskList.innerHTML='<div class="empty">No tasks here yet.</div>';
+        return;
+      }
+
+      els.taskList.innerHTML=filtered.map(task=>{
+        const progress=taskProgress(task);
+        return `
+        <div class="task-card ${task.completed?"completed":""}">
+          <div class="difficulty-dot ${difficultyKey(task)}"></div>
+          <div>
+            <div class="task-name">${escapeHtml(task.name)}</div>
+            ${task.notes?`<div class="task-note">${escapeHtml(task.notes)}</div>`:""}
+            <div class="chips">
+              <span class="chip">${formatAmount(task.amount)} ${escapeHtml(task.unit)}</span>
+              <span class="chip">${difficultyText(task)}</span>
+              <span class="chip">${task.deadline?`Due ${formatDate(parseDate(task.deadline),{month:"short",day:"numeric"})}`:"No deadline"}</span>
+              ${task.deadlineBlock?`<span class="chip">${BLOCK_LABELS[task.deadlineBlock]} deadline</span>`:""}
+              ${task.recurring?`<span class="chip">${task.frequency}</span>`:""}
+              ${task.allAtOnce?'<span class="chip">All at once</span>':""}
+            </div>
+            <div class="task-progress-wrap">
+              <div class="task-progress-copy"><span>${progress.timed.text}</span><strong class="${progress.timed.overMinutes?"time-overage":""}">${progress.percent}%</strong></div>
+              <div class="task-progress-track"><div class="task-progress-fill" style="width:${progress.percent}%"></div></div>
+              <div class="task-progress-secondary">${progress.doneBlocks} of ${progress.totalBlocks} scheduled blocks marked done ${task.recurring?"this week":""}</div>
+            </div>
+          </div>
+          <div class="task-actions">
+            <button class="task-action-text" onclick="toggleTask('${task.id}')">${task.completed?"Reopen":"Complete task"}</button>
+            <button class="task-action-text" onclick="editTask('${task.id}')">Edit</button>
+            <button class="task-action-text" onclick="deleteTask('${task.id}')">Delete</button>
+          </div>
+        </div>`;
+      }).join("");
+    }
+
+    function editTask(id){
+      const task=tasks.find(t=>t.id===id);
+      if(!task)return;
+      switchView("planView");
+      els.taskFormPanel.classList.remove("hidden");
+      els.editingId.value=task.id;
+      els.taskName.value=task.name;
+      els.notes.value=task.notes||"";
+      els.amount.value=task.amount;
+      els.unit.value=task.unit;
+      els.deadline.value=task.deadline||"";
+      els.deadlineBlock.value=task.deadlineBlock||"";
+      document.querySelector(`input[name="difficulty"][value="${task.motivation||2}"]`).checked=true;
+      els.recurring.checked=Boolean(task.recurring);
+      els.frequency.value=task.frequency||"weekly";
+      els.weekday.value=String(task.weekday??1);
+      els.repeatUntil.value=task.repeatUntil||"";
+      els.allAtOnce.checked=Boolean(task.allAtOnce);
+      els.recurringFields.classList.toggle("hidden",!task.recurring);
+      els.weekdayWrap.classList.toggle("hidden",els.frequency.value!=="weekly");
+      $("formTitle").textContent="Edit task";
+      $("saveTaskBtn").textContent="Save changes";
+      $("cancelEditBtn").classList.remove("hidden");
+      els.taskFormPanel.scrollIntoView({behavior:"smooth",block:"start"});
+    }
+
+    function toggleTask(id){
+      const task=tasks.find(t=>t.id===id);
+      if(!task)return;
+      task.completed=!task.completed;
+      persist();renderAll();
+    }
+
+    function deleteTask(id){
+      tasks=tasks.filter(t=>t.id!==id);
+      completedPlanKeys=new Set([...completedPlanKeys].filter(key=>!key.startsWith(id+"-")));
+      delete focusTaskSeconds[id];
+      Object.keys(focusBlockSeconds).filter(key=>key.startsWith(id+"-")).forEach(key=>delete focusBlockSeconds[key]);
+      Object.keys(manualMoves).filter(key=>key.startsWith(id+"-")).forEach(key=>delete manualMoves[key]);
+      persist();renderAll();showToast("Task deleted");
+    }
+
+    function renderStats(){
+      if(!masterPlan.length)return;
+      const items=visiblePlanItems();
+      const completed=items.filter(isItemDone);
+      const remaining=items.filter(item=>!isItemDone(item));
+      const visibleTasks=[...new Map(items.map(item=>[item.task.id,item.task])).values()];
+      const timedTasks=visibleTasks.filter(task=>taskTargetMinutes(task));
+      const totalTargetMinutes=timedTasks.reduce((sum,task)=>sum+taskTargetMinutes(task),0);
+      const loggedMinutes=timedTasks.reduce((sum,task)=>sum+taskTimeProgress(task).loggedMinutes,0);
+      const creditedMinutes=timedTasks.reduce((sum,task)=>sum+Math.min(taskTimeProgress(task).loggedMinutes,taskTargetMinutes(task)),0);
+      const remainingMinutes=Math.max(0,totalTargetMinutes-creditedMinutes);
+      const blockPercent=items.length?Math.round(completed.length/items.length*100):0;
+      const percent=totalTargetMinutes?Math.min(100,Math.round(creditedMinutes/totalTargetMinutes*100)):blockPercent;
+
+      $("statCompletedBlocks").textContent=completed.length;
+      $("statRemainingBlocks").textContent=remaining.length;
+      $("statCompletedEffort").textContent=totalTargetMinutes?formatDurationMinutes(loggedMinutes):`${Math.round(completed.reduce((s,i)=>s+i.weight,0)*10)/10}h`;
+      $("statRemainingEffort").textContent=totalTargetMinutes?formatDurationMinutes(remainingMinutes):`${Math.round(remaining.reduce((s,i)=>s+i.weight,0)*10)/10}h`;
+      $("progressPercent").textContent=`${percent}%`;
+      $("overallProgressFill").style.width=`${percent}%`;
+      $("progressHeadline").textContent=totalTargetMinutes
+        ? `${formatDurationMinutes(loggedMinutes)} focused toward ${formatDurationMinutes(totalTargetMinutes)}`
+        : items.length?`${completed.length} of ${items.length} work blocks completed`:"No work blocks in this view";
+      $("progressDetail").textContent=items.length
+        ? totalTargetMinutes
+          ? `${formatDurationMinutes(remainingMinutes)} timed work remaining · ${completed.length}/${items.length} scheduled blocks marked done`
+          : `${completed.length}/${items.length} scheduled blocks marked done`
+        : "Add a task or move to a week containing scheduled work.";
+    }
+
+    function renderSettings(){
+      els.divideBlocksSetting.checked=settings.divideBlocks;
+      els.highEnergyBlock.value=settings.highEnergyBlock;
+      $("morningStart").value=settings.blockTimes.morning.start;
+      $("morningEnd").value=settings.blockTimes.morning.end;
+      $("afternoonStart").value=settings.blockTimes.afternoon.start;
+      $("afternoonEnd").value=settings.blockTimes.afternoon.end;
+      $("eveningStart").value=settings.blockTimes.evening.start;
+      $("eveningEnd").value=settings.blockTimes.evening.end;
+      $("easyFocus").value=settings.timer.easy.focus;
+      $("easyBreak").value=settings.timer.easy.break;
+      $("neutralFocus").value=settings.timer.neutral.focus;
+      $("neutralBreak").value=settings.timer.neutral.break;
+      $("hardFocus").value=settings.timer.difficult.focus;
+      $("hardBreak").value=settings.timer.difficult.break;
+      $("timerStyle").value=settings.timerStyle;
+      $("timerSound").value=settings.timerSound||"gentle";
+      applyTheme();
+    }
+
+    function readSettings(){
+      settings.divideBlocks=els.divideBlocksSetting.checked;
+      settings.highEnergyBlock=els.highEnergyBlock.value;
+      settings.blockTimes={
+        morning:{start:$("morningStart").value||"08:00",end:$("morningEnd").value||"12:00"},
+        afternoon:{start:$("afternoonStart").value||"12:00",end:$("afternoonEnd").value||"16:00"},
+        evening:{start:$("eveningStart").value||"16:00",end:$("eveningEnd").value||"20:00"}
+      };
+      settings.timer={
+        easy:{focus:Number($("easyFocus").value)||40,break:Number($("easyBreak").value)||5},
+        neutral:{focus:Number($("neutralFocus").value)||30,break:Number($("neutralBreak").value)||5},
+        difficult:{focus:Number($("hardFocus").value)||20,break:Number($("hardBreak").value)||5}
+      };
+      settings.timerStyle=$("timerStyle").value;
+      settings.timerSound=$("timerSound").value;
+      persist();applyTheme();buildMasterPlan();renderStats();renderTasks();renderTimer();
+    }
+
+    function renderLiveTime(){
+      const now=new Date();
+      $("liveTime").innerHTML=`${now.toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"})}<br>${now.toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"})}`;
+    }
+
+    function startOfCurrentWeek(){
+      const now=todayStart();
+      const day=now.getDay();
+      const mondayOffset=day===0?-6:1-day;
+      return addDays(now,mondayOffset);
+    }
+
+    function endOfCurrentWeek(){
+      const end=addDays(startOfCurrentWeek(),6);
+      end.setHours(23,59,59,999);
+      return end;
+    }
+
+    function focusEntriesBetween(start,end){
+      return focusHistory.filter(entry=>{
+        const date=new Date(entry.completedAt);
+        return !Number.isNaN(date.getTime())&&date>=start&&date<=end;
+      });
+    }
+
+    function focusSummary(entries){
+      const byDifficulty={easy:0,neutral:0,difficult:0};
+      let totalSeconds=0;
+      entries.forEach(entry=>{
+        const seconds=Math.max(0,Number(entry.seconds)||0);
+        totalSeconds+=seconds;
+        const key=["easy","neutral","difficult"].includes(entry.difficulty)?entry.difficulty:"neutral";
+        byDifficulty[key]+=seconds;
+      });
+      return {totalSeconds,byDifficulty,sessions:entries.length};
+    }
+
+    function progressDuration(seconds){
+      const minutes=Math.round(Math.max(0,Number(seconds)||0)/60);
+      if(minutes<60)return `${minutes}m`;
+      const hours=Math.floor(minutes/60);
+      const mins=minutes%60;
+      return mins?`${hours}h ${mins}m`:`${hours}h`;
+    }
+
+    function difficultyDisplayName(key){
+      return key==="easy"?"Want to":key==="difficult"?"Avoiding it":"Neutral";
+    }
+
+    function difficultyBreakdownHtml(summary){
+      const total=Math.max(1,summary.totalSeconds);
+      return ["easy","neutral","difficult"].map(key=>{
+        const seconds=summary.byDifficulty[key]||0;
+        const percent=summary.totalSeconds?Math.round(seconds/total*100):0;
+        return `
+          <div class="difficulty-progress-row">
+            <div class="difficulty-progress-name ${key}">${difficultyDisplayName(key)}</div>
+            <div class="difficulty-progress-track" title="${percent}% of focused time">
+              <div class="difficulty-progress-fill ${key}" style="width:${percent}%"></div>
+            </div>
+            <div class="difficulty-progress-time">${progressDuration(seconds)} · ${percent}%</div>
+          </div>`;
+      }).join("");
+    }
+
+    function renderProgress(){
+      const now=new Date();
+      const todayStartDate=todayStart();
+      const todayEnd=new Date(todayStartDate);
+      todayEnd.setHours(23,59,59,999);
+      const weekStart=startOfCurrentWeek();
+      const weekEnd=endOfCurrentWeek();
+
+      const todayEntries=focusEntriesBetween(todayStartDate,todayEnd);
+      const weekEntries=focusEntriesBetween(weekStart,weekEnd);
+      const todaySummary=focusSummary(todayEntries);
+      const weekSummary=focusSummary(weekEntries);
+
+      $("progressTodayTotal").textContent=progressDuration(todaySummary.totalSeconds);
+      $("progressTodaySessions").textContent=`${todaySummary.sessions} completed session${todaySummary.sessions===1?"":"s"}`;
+      $("progressWeekTotal").textContent=progressDuration(weekSummary.totalSeconds);
+      $("progressWeekSessions").textContent=`${weekSummary.sessions} completed session${weekSummary.sessions===1?"":"s"}`;
+
+      const difficultyOrder=["easy","neutral","difficult"];
+      const topKey=difficultyOrder.reduce((best,key)=>{
+        return weekSummary.byDifficulty[key]>weekSummary.byDifficulty[best]?key:best;
+      },"easy");
+      if(weekSummary.totalSeconds){
+        $("progressTopDifficulty").textContent=difficultyDisplayName(topKey);
+        const topPercent=Math.round(weekSummary.byDifficulty[topKey]/weekSummary.totalSeconds*100);
+        $("progressTopDifficultyTime").textContent=`${progressDuration(weekSummary.byDifficulty[topKey])} · ${topPercent}% of this week`;
+      }else{
+        $("progressTopDifficulty").textContent="—";
+        $("progressTopDifficultyTime").textContent="No focus recorded yet";
+      }
+
+      const daysElapsed=Math.max(1,Math.min(7,Math.floor((todayStartDate-weekStart)/86400000)+1));
+      $("progressDailyAverage").textContent=progressDuration(weekSummary.totalSeconds/daysElapsed);
+      $("progressWeekLabel").textContent=`${formatDate(weekStart,{month:"short",day:"numeric"})} – ${formatDate(weekEnd,{month:"short",day:"numeric"})}`;
+
+      $("todayDifficultyBreakdown").innerHTML=difficultyBreakdownHtml(todaySummary);
+      $("weekDifficultyBreakdown").innerHTML=difficultyBreakdownHtml(weekSummary);
+
+      const dayData=Array.from({length:7},(_,index)=>{
+        const start=addDays(weekStart,index);
+        const end=new Date(start);
+        end.setHours(23,59,59,999);
+        const summary=focusSummary(focusEntriesBetween(start,end));
+        return {date:start,seconds:summary.totalSeconds};
+      });
+      const maxDaySeconds=Math.max(1,...dayData.map(day=>day.seconds));
+      $("weeklyFocusChart").innerHTML=dayData.map(day=>{
+        const height=day.seconds?Math.max(4,Math.round(day.seconds/maxDaySeconds*100)):2;
+        const isToday=sameDay(day.date,todayStartDate);
+        return `
+          <div class="chart-day">
+            <div class="chart-bar-wrap">
+              <div class="chart-bar" style="height:${height}%" title="${formatDate(day.date,{weekday:"long"})}: ${progressDuration(day.seconds)}"></div>
+            </div>
+            <div class="chart-value">${day.seconds?progressDuration(day.seconds):"0m"}</div>
+            <div class="chart-label ${isToday?"today":""}">${formatDate(day.date,{weekday:"short"})}</div>
+          </div>`;
+      }).join("");
+
+      const recent=[...focusHistory]
+        .filter(entry=>entry&&entry.completedAt)
+        .sort((a,b)=>new Date(b.completedAt)-new Date(a.completedAt))
+        .slice(0,10);
+      $("recentFocusList").innerHTML=recent.length?recent.map(entry=>{
+        const date=new Date(entry.completedAt);
+        const key=["easy","neutral","difficult"].includes(entry.difficulty)?entry.difficulty:"neutral";
+        return `
+          <div class="recent-focus-item">
+            <div class="recent-focus-dot ${key}"></div>
+            <div>
+              <div class="recent-focus-title">${escapeHtml(entry.taskName||"Focus session")}</div>
+              <div class="recent-focus-meta">${difficultyDisplayName(key)} · ${date.toLocaleDateString(undefined,{month:"short",day:"numeric"})} at ${date.toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"})}</div>
+            </div>
+            <div class="recent-focus-time">${progressDuration(entry.seconds)}</div>
+          </div>`;
+      }).join(""):'<div class="progress-empty">Complete a focus timer to begin building your progress history.</div>';
+
+      const historicalSeconds=Object.values(focusTaskSeconds).reduce((sum,value)=>sum+(Number(value)||0),0);
+      const datedSeconds=focusHistory.reduce((sum,entry)=>sum+(Number(entry.seconds)||0),0);
+      $("progressHistoryNote").classList.toggle("hidden",historicalSeconds<=datedSeconds+1);
+    }
+
+    function renderAll(){
+      buildMasterPlan();
+      renderStats();
+      renderTasks();
+      renderTimer();
+      renderProgress();
+    }
+
+    function showFatalError(error){
+      console.error(error);
+      const panel=$("fatalError");
+      const message=$("fatalErrorMessage");
+      if(message)message.textContent=`The app encountered a loading problem: ${error&&error.message?error.message:"Unknown error"}. Your HTML file is still safe.`;
+      if(panel)panel.classList.remove("hidden");
+    }
+    function hideFatalError(){
+      const panel=$("fatalError");
+      if(panel)panel.classList.add("hidden");
+    }
+    function resetSavedAppData(){
+      [TASKS_KEY,SETTINGS_KEY,PROGRESS_KEY,FOCUS_TASK_KEY,FOCUS_BLOCK_KEY,MANUAL_MOVES_KEY,FOCUS_HISTORY_KEY,OLD_TASKS_KEY,OLD_SETTINGS_KEY].forEach(storageRemove);
+      tasks=[];
+      settings=mergeSettings({});
+      completedPlanKeys=new Set();
+      focusTaskSeconds={};
+      focusBlockSeconds={};
+      manualMoves={};
+      focusHistory=[];
+      hideFatalError();
+      renderSettings();
+      renderAll();
+      showToast("Saved app data reset");
+    }
+    function bootApp(){
+      hideFatalError();
+      renderSettings();
+      renderLiveTime();
+      renderAll();
+    }
+
+    document.querySelectorAll(".main-tab").forEach(tab=>tab.addEventListener("click",()=>switchView(tab.dataset.view)));
+
+    $("settingsBtn").addEventListener("click",()=>{
+      els.settingsDrawer.classList.add("open");
+      els.drawerBackdrop.classList.add("open");
+      document.body.style.overflow="hidden";
+    });
+    function closeSettings(){
+      els.settingsDrawer.classList.remove("open");
+      els.drawerBackdrop.classList.remove("open");
+      document.body.style.overflow="";
+    }
+    $("closeSettingsBtn").addEventListener("click",closeSettings);
+    els.drawerBackdrop.addEventListener("click",closeSettings);
+
+    $("openTaskFormBtn").addEventListener("click",()=>openTaskForm(false));
+    $("closeTaskFormBtn").addEventListener("click",closeTaskForm);
+    $("cancelEditBtn").addEventListener("click",()=>resetTaskForm(true));
+    els.recurring.addEventListener("change",()=>els.recurringFields.classList.toggle("hidden",!els.recurring.checked));
+    els.frequency.addEventListener("change",()=>els.weekdayWrap.classList.toggle("hidden",els.frequency.value!=="weekly"));
+
+    els.taskForm.addEventListener("submit",event=>{
+      event.preventDefault();
+      const id=els.editingId.value;
+      const current=tasks.find(t=>t.id===id);
+      const task={
+        id:id||uid(),
+        name:els.taskName.value.trim(),
+        notes:els.notes.value.trim(),
+        amount:Number(els.amount.value),
+        unit:els.unit.value,
+        deadline:els.deadline.value,
+        deadlineBlock:els.deadlineBlock.value,
+        motivation:Number(document.querySelector('input[name="difficulty"]:checked').value),
+        recurring:els.recurring.checked,
+        frequency:els.frequency.value,
+        weekday:Number(els.weekday.value),
+        repeatUntil:els.repeatUntil.value,
+        allAtOnce:els.allAtOnce.checked,
+        completed:current?.completed||false,
+        createdAt:current?.createdAt||new Date().toISOString()
+      };
+      if(current)tasks[tasks.findIndex(t=>t.id===id)]=task;
+      else tasks.push(task);
+      persist();resetTaskForm(true);renderAll();
+      showToast(current?"Task updated":"Task added");
+    });
+
+    els.searchInput.addEventListener("input",renderTasks);
+    els.filterSelect.addEventListener("change",renderTasks);
+
+    $("prevWeekBtn").addEventListener("click",()=>{
+      if(weekOffset===0)return;
+      weekOffset-=1;buildMasterPlan();renderStats();renderTasks();
+    });
+    $("nextWeekBtn").addEventListener("click",()=>{
+      weekOffset+=1;buildMasterPlan();renderStats();renderTasks();
+    });
+    $("rebalanceBtn").addEventListener("click",()=>{buildMasterPlan();renderStats();renderTasks();showToast("Plan rebalanced")});
+
+    $("timerStartPauseBtn").addEventListener("click",()=>{
+      if(!activeTimer)return;
+      activeTimer.running=!activeTimer.running;
+      if(activeTimer.running)startTimerTicker();
+      renderTimer();
+    });
+    $("timerResetBtn").addEventListener("click",resetTimer);
+    $("timerCompleteBtn").addEventListener("click",()=>{
+      if(!activeTimer)return;
+      togglePlanItemDone(activeTimer.item.progressKey);
+    });
+    $("timerBackBtn").addEventListener("click",()=>switchView("planView"));
+    $("miniTimerButton").addEventListener("click",()=>switchView("timerView"));
+
+    [
+      els.divideBlocksSetting,els.highEnergyBlock,
+      $("morningStart"),$("morningEnd"),$("afternoonStart"),$("afternoonEnd"),
+      $("eveningStart"),$("eveningEnd"),$("easyFocus"),$("easyBreak"),
+      $("neutralFocus"),$("neutralBreak"),$("hardFocus"),$("hardBreak"),$("timerStyle"),$("timerSound")
+    ].forEach(input=>input.addEventListener("change",readSettings));
+
+    $("previewSoundBtn").addEventListener("click",()=>{
+      ensureAudioContext();
+      settings.timerSound=$("timerSound").value;
+      persist();
+      playTimerSound(settings.timerSound);
+    });
+
+    document.querySelectorAll(".theme-swatch").forEach(button=>button.addEventListener("click",()=>{
+      settings.theme=button.dataset.theme;
+      persist();applyTheme();
+    }));
+
+    $("generatePlanBtn").addEventListener("click",()=>{
+      readSettings();closeSettings();switchView("planView");showToast("Plan generated");
+    });
+
+    $("clearTasksBtn").addEventListener("click",()=>{
+      if(!confirm("Delete all tasks from this browser?"))return;
+      tasks=[];completedPlanKeys.clear();focusTaskSeconds={};focusBlockSeconds={};manualMoves={};persist();renderAll();closeSettings();showToast("All tasks and progress cleared");
+    });
+
+    $("loadDemoBtn").addEventListener("click",()=>{
+      const start=todayStart();
+      tasks=[
+        {
+          id:uid(),name:"Finalize research paper",notes:"Review figures, references, and formatting.",
+          amount:5,unit:"hours",deadline:dateKey(addDays(start,3)),deadlineBlock:"evening",
+          motivation:3,recurring:false,frequency:"weekly",weekday:1,repeatUntil:"",
+          allAtOnce:false,completed:false,createdAt:new Date().toISOString()
+        },
+        {
+          id:uid(),name:"Prepare for Monday meeting",notes:"Review agenda and write progress notes.",
+          amount:2,unit:"hours",deadline:"",deadlineBlock:"evening",
+          motivation:2,recurring:true,frequency:"weekly",weekday:1,repeatUntil:"",
+          allAtOnce:false,completed:false,createdAt:new Date().toISOString()
+        },
+        {
+          id:uid(),name:"Cook meals",notes:"Use ingredients already in the fridge.",
+          amount:5,unit:"meals",deadline:dateKey(addDays(start,5)),deadlineBlock:"",
+          motivation:2,recurring:false,frequency:"weekly",weekday:1,repeatUntil:"",
+          allAtOnce:false,completed:false,createdAt:new Date().toISOString()
+        },
+        {
+          id:uid(),name:"Clean the bathroom",notes:"",
+          amount:1,unit:"sessions",deadline:"",deadlineBlock:"",
+          motivation:3,recurring:false,frequency:"weekly",weekday:1,repeatUntil:"",
+          allAtOnce:true,completed:false,createdAt:new Date().toISOString()
+        }
+      ];
+      persist();renderAll();showToast("Demo tasks loaded");
+    });
+
+    window.startTaskTimer=startTaskTimer;
+    window.startPlanDrag=startPlanDrag;
+    window.endPlanDrag=endPlanDrag;
+    window.allowPlanDrop=allowPlanDrop;
+    window.highlightPlanDrop=highlightPlanDrop;
+    window.unhighlightPlanDrop=unhighlightPlanDrop;
+    window.dropPlanItem=dropPlanItem;
+    window.togglePlanItemDone=togglePlanItemDone;
+    window.redistributeBlock=redistributeBlock;
+    window.toggleTask=toggleTask;
+    window.editTask=editTask;
+    window.deleteTask=deleteTask;
+
+    $("retryAppBtn").addEventListener("click",()=>{
+      try{bootApp();}catch(error){showFatalError(error);}
+    });
+    $("resetAppBtn").addEventListener("click",()=>{
+      try{resetSavedAppData();}catch(error){showFatalError(error);}
+    });
+
+    try{bootApp();}catch(error){showFatalError(error);}
+    setInterval(()=>{
+      try{
+        renderLiveTime();
+        if(weekOffset===0){buildMasterPlan();renderStats();renderTasks();}
+      }catch(error){showFatalError(error);}
+    },60000);
+  </script>
+</body>
+</html>
