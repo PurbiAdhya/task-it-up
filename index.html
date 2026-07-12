@@ -15,6 +15,7 @@
       --primary-dark:#1d4ed8;
       --primary-soft:#dbeafe;
       --primary-rgb:37,99,235;
+      --primary-contrast:#fff;
       --success:#16a34a;
       --warning:#ca8a04;
       --danger:#dc2626;
@@ -38,7 +39,7 @@
     button{cursor:pointer}
     .hidden{display:none !important}
 
-    .app-shell{max-width:1180px;margin:0 auto;padding:22px}
+    .app-shell{width:100%;max-width:none;min-height:100vh;margin:0;padding:18px 20px}
     .topbar{
       display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:16px
     }
@@ -46,7 +47,7 @@
     .brand-mark{
       width:52px;height:52px;border-radius:17px;display:grid;place-items:center;
       background:linear-gradient(145deg,var(--primary),var(--primary-dark));
-      color:#fff;font-size:25px;font-weight:900;box-shadow:0 12px 24px rgba(var(--primary-rgb),.24);
+      color:var(--primary-contrast);font-size:25px;font-weight:900;box-shadow:0 12px 24px rgba(var(--primary-rgb),.24);
       flex:0 0 auto
     }
     .brand h1{margin:0;font-size:clamp(1.65rem,4vw,2.3rem);letter-spacing:-.04em}
@@ -69,7 +70,7 @@
       border:0;border-radius:13px;padding:10px 15px;font-weight:800;transition:.18s ease
     }
     .btn:hover{transform:translateY(-1px)}
-    .btn-primary{background:var(--primary);color:#fff;box-shadow:0 8px 18px rgba(var(--primary-rgb),.20)}
+    .btn-primary{background:var(--primary);color:var(--primary-contrast);box-shadow:0 8px 18px rgba(var(--primary-rgb),.20)}
     .btn-primary:hover{background:var(--primary-dark)}
     .btn-ghost{background:#fff;color:var(--ink);border:1px solid var(--line)}
     .btn-soft{background:var(--primary-soft);color:var(--primary-dark)}
@@ -89,7 +90,7 @@
       border:0;border-radius:12px;background:transparent;color:var(--muted);
       padding:11px 12px;font-weight:850
     }
-    .main-tab.active{background:var(--primary);color:#fff;box-shadow:0 7px 15px rgba(var(--primary-rgb),.20)}
+    .main-tab.active{background:var(--primary);color:var(--primary-contrast);box-shadow:0 7px 15px rgba(var(--primary-rgb),.20)}
 
     .panel{
       background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
@@ -123,7 +124,7 @@
 
     .plan-workspace{
       display:grid;
-      grid-template-columns:minmax(300px,360px) minmax(0,1fr);
+      grid-template-columns:minmax(280px,330px) minmax(0,1fr);
       gap:16px;
       align-items:start
     }
@@ -134,6 +135,7 @@
     .balanced-column{
       min-width:0
     }
+    .balanced-column .plan-panel{overflow:hidden}
 
     .mini-timer-button{
       display:inline-flex;
@@ -177,15 +179,49 @@
     }
     .week-arrow:disabled{opacity:.35;cursor:not-allowed}
 
-    .schedule-grid{display:grid;grid-template-columns:1fr;gap:12px}
-    .day-card{border:1px solid var(--line);border-radius:17px;overflow:hidden;background:#fafafa}
-    .day-head{
-      display:flex;align-items:flex-start;justify-content:space-between;gap:12px;
-      padding:13px 14px;background:#fff;border-bottom:1px solid var(--line)
+    .schedule-grid{
+      display:grid;
+      grid-template-columns:repeat(7,minmax(180px,1fr));
+      gap:10px;
+      overflow-x:auto;
+      align-items:start;
+      padding-bottom:8px;
+      scroll-snap-type:x proximity
     }
-    .day-head strong{display:block;font-size:.98rem}
-    .day-head span{display:block;color:var(--muted);font-size:.75rem;margin-top:2px}
-    .day-load{height:5px;background:#edf0f4;border-radius:999px;overflow:hidden;margin-top:8px}
+    .day-card{
+      min-width:0;
+      height:100%;
+      border:1px solid var(--line);
+      border-radius:15px;
+      overflow:hidden;
+      background:#fafafa;
+      scroll-snap-align:start
+    }
+    .day-head{
+      display:block;
+      padding:12px;
+      background:#fff;
+      border-bottom:1px solid var(--line)
+    }
+    .day-head strong{display:block;font-size:.9rem}
+    .day-head span{display:block;color:var(--muted);font-size:.68rem;margin-top:2px}
+    .day-progress-row{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:8px;
+      margin-top:9px;
+      color:var(--muted);
+      font-size:.64rem;
+      font-weight:800
+    }
+    .day-load{
+      height:7px;
+      background:#edf0f4;
+      border-radius:999px;
+      overflow:hidden;
+      margin-top:5px
+    }
     .day-load > div{height:100%;background:var(--primary);border-radius:inherit}
     .day-body{padding:10px;display:grid;grid-template-columns:1fr;gap:9px}
     .block-bin{border:1px solid var(--line);border-radius:13px;background:#fff;overflow:hidden;width:100%}
@@ -269,9 +305,13 @@
       transform-origin:50% 100%;transform:translate(-50%,-100%) rotate(var(--hand,0deg));
       border-radius:999px;z-index:2
     }
-    .analog-center{
-      position:absolute;inset:0;display:grid;place-items:center;z-index:3;font-size:2.3rem;
-      font-weight:950;font-variant-numeric:tabular-nums
+    .analog-digital-readout{
+      margin-top:17px;
+      font-size:2.5rem;
+      line-height:1;
+      font-weight:950;
+      letter-spacing:-.04em;
+      font-variant-numeric:tabular-nums
     }
     .analog-dot{
       position:absolute;left:50%;top:50%;width:14px;height:14px;border-radius:50%;
@@ -383,7 +423,7 @@
       display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px
     }
     .add-task-tab-button{
-      border:1px solid rgba(var(--primary-rgb),.35);background:var(--primary);color:#fff;
+      border:1px solid rgba(var(--primary-rgb),.35);background:var(--primary);color:var(--primary-contrast);
       border-radius:13px;padding:10px 15px;font-weight:900;box-shadow:0 7px 15px rgba(var(--primary-rgb),.18)
     }
     .task-form-panel{
@@ -548,6 +588,7 @@
       .main-tabs{top:5px}
       .plan-workspace{grid-template-columns:1fr}
       .tasks-column{position:static}
+      .schedule-grid{grid-template-columns:repeat(7,minmax(82vw,1fr));overflow-x:auto}
       .stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
       .stat{padding:13px}
       .progress-overview{grid-template-columns:1fr auto;padding:13px}
@@ -627,7 +668,7 @@
 
               <div class="field">
                 <label for="taskName">Task name *</label>
-                <input id="taskName" required placeholder="e.g., Finalize research paper" />
+                <input id="taskName" required placeholder="e.g., Study" />
               </div>
 
               <div class="field">
@@ -758,27 +799,10 @@
           <div class="balanced-column">
 
 
-        <div class="progress-overview">
-          <div>
-            <div class="progress-eyebrow">Visible seven-day plan</div>
-            <h3 class="progress-headline" id="progressHeadline">No work completed yet</h3>
-            <div class="progress-detail" id="progressDetail">Complete a work block to begin tracking progress.</div>
-          </div>
-          <div class="progress-percent" id="progressPercent">0%</div>
-          <div class="overall-progress-track"><div class="overall-progress-fill" id="overallProgressFill"></div></div>
-        </div>
-
-        <div class="stats">
-          <div class="stat"><div class="stat-label">Blocks done</div><div class="stat-value" id="statCompletedBlocks">0</div><div class="stat-sub">in this seven-day view</div></div>
-          <div class="stat"><div class="stat-label">Blocks left</div><div class="stat-value" id="statRemainingBlocks">0</div><div class="stat-sub">still to complete</div></div>
-          <div class="stat"><div class="stat-label">Focus logged</div><div class="stat-value" id="statCompletedEffort">0m</div><div class="stat-sub">completed timer work</div></div>
-          <div class="stat"><div class="stat-label">Time left</div><div class="stat-value" id="statRemainingEffort">0m</div><div class="stat-sub">against time estimates</div></div>
-        </div>
-
         <div class="panel plan-panel">
           <div class="toolbar">
             <div>
-              <h2>Balanced plan</h2>
+              <h2>Task-it-up plan</h2>
               <div class="hint" id="planSubtitle">The next seven days, based on current availability.</div>
             </div>
             <div class="toolbar-actions">
@@ -818,9 +842,9 @@
               <div id="analogTimer" class="analog-wrap hidden">
                 <div class="analog-clock" id="analogClock">
                   <div class="analog-hand" id="analogHand"></div>
-                  <div class="analog-center" id="analogCenter">20:00</div>
                   <div class="analog-dot"></div>
                 </div>
+                <div class="analog-digital-readout" id="analogCenter">20:00</div>
               </div>
 
               <div class="timer-actions">
@@ -1017,13 +1041,13 @@
     <div class="settings-card">
       <h3>Theme color</h3>
       <div class="theme-swatches" id="themeSwatches">
-        <button class="theme-swatch" data-theme="blue" style="background:#2563eb" title="Blue"></button>
-        <button class="theme-swatch" data-theme="aqua" style="background:#0891b2" title="Aqua"></button>
-        <button class="theme-swatch" data-theme="green" style="background:#16a34a" title="Green"></button>
-        <button class="theme-swatch" data-theme="yellow" style="background:#ca8a04" title="Yellow"></button>
-        <button class="theme-swatch" data-theme="orange" style="background:#ea580c" title="Orange"></button>
-        <button class="theme-swatch" data-theme="red" style="background:#dc2626" title="Red"></button>
-        <button class="theme-swatch" data-theme="purple" style="background:#7c3aed" title="Purple"></button>
+        <button class="theme-swatch" data-theme="violet" style="background:#C9C1FA" title="Violet" aria-label="Violet theme"></button>
+        <button class="theme-swatch" data-theme="blue" style="background:#B7D0FC" title="Blue" aria-label="Blue theme"></button>
+        <button class="theme-swatch" data-theme="aqua" style="background:#AFE2E4" title="Aqua" aria-label="Aqua theme"></button>
+        <button class="theme-swatch" data-theme="green" style="background:#B9DFC7" title="Green" aria-label="Green theme"></button>
+        <button class="theme-swatch" data-theme="yellow" style="background:#F2DFA5" title="Yellow" aria-label="Yellow theme"></button>
+        <button class="theme-swatch" data-theme="orange" style="background:#F3C29F" title="Orange" aria-label="Orange theme"></button>
+        <button class="theme-swatch" data-theme="red" style="background:#EDB5B7" title="Red" aria-label="Red theme"></button>
       </div>
     </div>
 
@@ -1039,8 +1063,6 @@
     <div class="settings-card">
       <h3>Task management</h3>
       <div class="settings-actions">
-        <button class="btn btn-ghost" id="loadDemoBtn">Load demo tasks</button>
-        <button class="btn btn-primary" id="generatePlanBtn">Generate plan</button>
         <button class="btn btn-danger" id="clearTasksBtn">Clear all tasks</button>
       </div>
     </div>
@@ -1071,13 +1093,14 @@
     const OLD_SETTINGS_KEY="taskItUpSettingsV2";
 
     const THEMES={
-      blue:{primary:"#2563eb",dark:"#1d4ed8",soft:"#dbeafe",rgb:"37,99,235",bg:"#f5f8ff"},
-      aqua:{primary:"#0891b2",dark:"#0e7490",soft:"#cffafe",rgb:"8,145,178",bg:"#f0fdff"},
-      green:{primary:"#16a34a",dark:"#15803d",soft:"#dcfce7",rgb:"22,163,74",bg:"#f3fcf6"},
-      yellow:{primary:"#ca8a04",dark:"#a16207",soft:"#fef9c3",rgb:"202,138,4",bg:"#fffdf2"},
-      orange:{primary:"#ea580c",dark:"#c2410c",soft:"#ffedd5",rgb:"234,88,12",bg:"#fff8f3"},
-      red:{primary:"#dc2626",dark:"#b91c1c",soft:"#fee2e2",rgb:"220,38,38",bg:"#fff6f6"},
-      purple:{primary:"#7c3aed",dark:"#6d28d9",soft:"#ede9fe",rgb:"124,58,237",bg:"#faf7ff"}
+      violet:{primary:"#8B7CF6",dark:"#6758D1",soft:"#F0EDFF",rgb:"139,124,246",bg:"#FAF9FF",contrast:"#FFFFFF"},
+      blue:{primary:"#6A9CF5",dark:"#4776C8",soft:"#EAF2FF",rgb:"106,156,245",bg:"#F7FAFF",contrast:"#FFFFFF"},
+      aqua:{primary:"#55BEC4",dark:"#318F95",soft:"#E5F8F8",rgb:"85,190,196",bg:"#F5FCFC",contrast:"#FFFFFF"},
+      green:{primary:"#69B987",dark:"#438E60",soft:"#EAF7EF",rgb:"105,185,135",bg:"#F7FCF9",contrast:"#FFFFFF"},
+      yellow:{primary:"#D6AD43",dark:"#A27C1B",soft:"#FFF5D4",rgb:"214,173,67",bg:"#FFFCF2",contrast:"#3E2E05"},
+      orange:{primary:"#E8955A",dark:"#BC6830",soft:"#FFF0E5",rgb:"232,149,90",bg:"#FFF9F5",contrast:"#FFFFFF"},
+      red:{primary:"#DD7B7E",dark:"#B55256",soft:"#FDEBEC",rgb:"221,123,126",bg:"#FFF8F8",contrast:"#FFFFFF"},
+      purple:{primary:"#8B7CF6",dark:"#6758D1",soft:"#F0EDFF",rgb:"139,124,246",bg:"#FAF9FF",contrast:"#FFFFFF"}
     };
 
     const defaultSettings={
@@ -1541,12 +1564,14 @@
     }
 
     function applyTheme(){
+      if(settings.theme==="purple")settings.theme="violet";
       const t=THEMES[settings.theme]||THEMES.blue;
       const root=document.documentElement.style;
       root.setProperty("--primary",t.primary);
       root.setProperty("--primary-dark",t.dark);
       root.setProperty("--primary-soft",t.soft);
       root.setProperty("--primary-rgb",t.rgb);
+      root.setProperty("--primary-contrast",t.contrast||"#fff");
       root.setProperty("--bg",t.bg);
       document.querySelectorAll(".theme-swatch").forEach(btn=>{
         btn.classList.toggle("active",btn.dataset.theme===settings.theme);
@@ -1886,7 +1911,6 @@
     function renderPlan(){
       if(!masterPlan.length)return;
       const days=currentViewDays();
-      const maxLoad=Math.max(1,...days.map(day=>day.load));
       const start=days[0]?.date||todayStart();
       const end=days[days.length-1]?.date||addDays(start,6);
 
@@ -1903,7 +1927,11 @@
 
       els.scheduleGrid.innerHTML=days.map(day=>{
         const globalIndex=day.index;
-        const percent=Math.round(day.load/maxLoad*100);
+        const totalDayItems=day.items.length;
+        const completedDayItems=day.items.filter(isItemDone).length;
+        const percent=totalDayItems
+          ? Math.round(completedDayItems/totalDayItems*100)
+          : 0;
         const isToday=globalIndex===0;
         let body="";
 
@@ -1953,12 +1981,15 @@
         return `
           <article class="day-card">
             <div class="day-head">
-              <div>
-                <strong>${isToday?"Today":formatDate(day.date,{weekday:"long"})}</strong>
-                <span>${formatDate(day.date,{month:"long",day:"numeric",year:"numeric"})}</span>
-                <div class="day-load"><div style="width:${percent}%"></div></div>
+              <strong>${isToday?"Today":formatDate(day.date,{weekday:"short"})}</strong>
+              <span>${formatDate(day.date,{month:"short",day:"numeric"})}</span>
+              <div class="day-progress-row">
+                <span>${completedDayItems}/${totalDayItems} completed</span>
+                <span>${percent}%</span>
               </div>
-              <div class="block-meta">${day.load.toFixed(1)} total effort</div>
+              <div class="day-load" aria-label="${percent}% of the day's tasks completed">
+                <div style="width:${percent}%"></div>
+              </div>
             </div>
             <div class="day-body">${body}</div>
           </article>`;
@@ -2366,33 +2397,7 @@
     }
 
     function renderStats(){
-      if(!masterPlan.length)return;
-      const items=visiblePlanItems();
-      const completed=items.filter(isItemDone);
-      const remaining=items.filter(item=>!isItemDone(item));
-      const visibleTasks=[...new Map(items.map(item=>[item.task.id,item.task])).values()];
-      const timedTasks=visibleTasks.filter(task=>taskTargetMinutes(task));
-      const totalTargetMinutes=timedTasks.reduce((sum,task)=>sum+taskTargetMinutes(task),0);
-      const loggedMinutes=timedTasks.reduce((sum,task)=>sum+taskTimeProgress(task).loggedMinutes,0);
-      const creditedMinutes=timedTasks.reduce((sum,task)=>sum+Math.min(taskTimeProgress(task).loggedMinutes,taskTargetMinutes(task)),0);
-      const remainingMinutes=Math.max(0,totalTargetMinutes-creditedMinutes);
-      const blockPercent=items.length?Math.round(completed.length/items.length*100):0;
-      const percent=totalTargetMinutes?Math.min(100,Math.round(creditedMinutes/totalTargetMinutes*100)):blockPercent;
-
-      $("statCompletedBlocks").textContent=completed.length;
-      $("statRemainingBlocks").textContent=remaining.length;
-      $("statCompletedEffort").textContent=totalTargetMinutes?formatDurationMinutes(loggedMinutes):`${Math.round(completed.reduce((s,i)=>s+i.weight,0)*10)/10}h`;
-      $("statRemainingEffort").textContent=totalTargetMinutes?formatDurationMinutes(remainingMinutes):`${Math.round(remaining.reduce((s,i)=>s+i.weight,0)*10)/10}h`;
-      $("progressPercent").textContent=`${percent}%`;
-      $("overallProgressFill").style.width=`${percent}%`;
-      $("progressHeadline").textContent=totalTargetMinutes
-        ? `${formatDurationMinutes(loggedMinutes)} focused toward ${formatDurationMinutes(totalTargetMinutes)}`
-        : items.length?`${completed.length} of ${items.length} work blocks completed`:"No work blocks in this view";
-      $("progressDetail").textContent=items.length
-        ? totalTargetMinutes
-          ? `${formatDurationMinutes(remainingMinutes)} timed work remaining · ${completed.length}/${items.length} scheduled blocks marked done`
-          : `${completed.length}/${items.length} scheduled blocks marked done`
-        : "Add a task or move to a week containing scheduled work.";
+      // Plan completion is now displayed within each individual day.
     }
 
     function renderSettings(){
@@ -2715,44 +2720,9 @@
       persist();applyTheme();
     }));
 
-    $("generatePlanBtn").addEventListener("click",()=>{
-      readSettings();closeSettings();switchView("planView");showToast("Plan generated");
-    });
-
     $("clearTasksBtn").addEventListener("click",()=>{
       if(!confirm("Delete all tasks from this browser?"))return;
       tasks=[];completedPlanKeys.clear();focusTaskSeconds={};focusBlockSeconds={};manualMoves={};persist();renderAll();closeSettings();showToast("All tasks and progress cleared");
-    });
-
-    $("loadDemoBtn").addEventListener("click",()=>{
-      const start=todayStart();
-      tasks=[
-        {
-          id:uid(),name:"Finalize research paper",notes:"Review figures, references, and formatting.",
-          amount:5,unit:"hours",deadline:dateKey(addDays(start,3)),deadlineBlock:"evening",
-          motivation:3,recurring:false,frequency:"weekly",weekday:1,repeatUntil:"",
-          allAtOnce:false,completed:false,createdAt:new Date().toISOString()
-        },
-        {
-          id:uid(),name:"Prepare for Monday meeting",notes:"Review agenda and write progress notes.",
-          amount:2,unit:"hours",deadline:"",deadlineBlock:"evening",
-          motivation:2,recurring:true,frequency:"weekly",weekday:1,repeatUntil:"",
-          allAtOnce:false,completed:false,createdAt:new Date().toISOString()
-        },
-        {
-          id:uid(),name:"Cook meals",notes:"Use ingredients already in the fridge.",
-          amount:5,unit:"meals",deadline:dateKey(addDays(start,5)),deadlineBlock:"",
-          motivation:2,recurring:false,frequency:"weekly",weekday:1,repeatUntil:"",
-          allAtOnce:false,completed:false,createdAt:new Date().toISOString()
-        },
-        {
-          id:uid(),name:"Clean the bathroom",notes:"",
-          amount:1,unit:"sessions",deadline:"",deadlineBlock:"",
-          motivation:3,recurring:false,frequency:"weekly",weekday:1,repeatUntil:"",
-          allAtOnce:true,completed:false,createdAt:new Date().toISOString()
-        }
-      ];
-      persist();renderAll();showToast("Demo tasks loaded");
     });
 
     window.startTaskTimer=startTaskTimer;
