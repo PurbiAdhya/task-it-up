@@ -52,6 +52,15 @@
     .brand h1{margin:0;font-size:clamp(1.65rem,4vw,2.3rem);letter-spacing:-.04em}
     .brand p{margin:3px 0 0;color:var(--muted);font-size:.9rem}
     .top-actions{display:flex;align-items:center;gap:9px}
+    .cloud-account{
+      display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap
+    }
+    .cloud-status{
+      color:var(--muted);font-size:.69rem;font-weight:800;max-width:190px;
+      white-space:nowrap;overflow:hidden;text-overflow:ellipsis
+    }
+    .cloud-auth-button{padding:8px 11px;font-size:.72rem;white-space:nowrap}
+    .cloud-auth-button:disabled{opacity:.58;cursor:not-allowed;transform:none}
     .live-time{
       color:var(--muted);font-size:.8rem;font-weight:750;text-align:right;line-height:1.35
     }
@@ -533,6 +542,9 @@
       .brand p{display:none}
       .brand-mark{width:45px;height:45px;border-radius:14px}
       .live-time{display:none}
+      .cloud-status{display:none}
+      .cloud-account{margin-left:auto}
+      .cloud-auth-button{padding:7px 9px;font-size:.68rem}
       .main-tabs{top:5px}
       .plan-workspace{grid-template-columns:1fr}
       .tasks-column{position:static}
@@ -569,6 +581,17 @@
       </div>
       <div class="top-actions">
         <div class="live-time" id="liveTime"></div>
+
+        <div class="cloud-account">
+          <span class="cloud-status" id="cloudStatus">Saved on this device</span>
+          <button class="btn btn-soft cloud-auth-button" id="signInButton" type="button" disabled>
+            Connecting…
+          </button>
+          <button class="btn btn-ghost cloud-auth-button hidden" id="signOutButton" type="button">
+            Sign out
+          </button>
+        </div>
+
         <button class="icon-btn" id="settingsBtn" aria-label="Open settings" title="Settings">⚙</button>
       </div>
     </header>
@@ -1005,6 +1028,15 @@
     </div>
 
     <div class="settings-card">
+      <h3>Cloud sync</h3>
+      <div class="hint">
+        Sign in from the top-right corner to synchronize tasks, settings, timer progress,
+        manual moves, and focus history across devices. Local saving remains active when
+        signed out or offline.
+      </div>
+    </div>
+
+    <div class="settings-card">
       <h3>Task management</h3>
       <div class="settings-actions">
         <button class="btn btn-ghost" id="loadDemoBtn">Load demo tasks</button>
@@ -1034,6 +1066,7 @@
     const FOCUS_BLOCK_KEY="taskItUpFocusBlockSecondsV1";
     const MANUAL_MOVES_KEY="taskItUpManualMovesV1";
     const FOCUS_HISTORY_KEY="taskItUpFocusHistoryV1";
+    const CLOUD_LOCAL_REVISION_KEY="taskItUpLocalRevisionV1";
     const OLD_TASKS_KEY="taskItUpTasksV2";
     const OLD_SETTINGS_KEY="taskItUpSettingsV2";
 
@@ -1130,6 +1163,16 @@
     let timerTicker=null;
     let audioContext=null;
 
+    let firebaseAuth=null;
+    let firebaseDb=null;
+    let firebaseUser=null;
+    let firebaseFunctions=null;
+    let cloudUnsubscribe=null;
+    let cloudSaveTimer=null;
+    let applyingCloudState=false;
+    let firebaseInitializationAttempted=false;
+    let localRevisionAt=Number(storageGet(CLOUD_LOCAL_REVISION_KEY)||0);
+
     const BLOCKS=["morning","afternoon","evening"];
     const BLOCK_LABELS={morning:"Morning",afternoon:"Afternoon",evening:"Evening"};
 
@@ -1146,7 +1189,7 @@
       scheduleGrid:$("scheduleGrid")
     };
 
-    function persist(){
+    function persistLocal(updateRevision=true){
       storageSet(TASKS_KEY,JSON.stringify(tasks));
       storageSet(SETTINGS_KEY,JSON.stringify(settings));
       storageSet(PROGRESS_KEY,JSON.stringify([...completedPlanKeys]));
@@ -1154,6 +1197,322 @@
       storageSet(FOCUS_BLOCK_KEY,JSON.stringify(focusBlockSeconds));
       storageSet(MANUAL_MOVES_KEY,JSON.stringify(manualMoves));
       storageSet(FOCUS_HISTORY_KEY,JSON.stringify(focusHistory));
+
+      if(updateRevision){
+        localRevisionAt=Date.now();
+        storageSet(CLOUD_LOCAL_REVISION_KEY,String(localRevisionAt));
+      }
+    }
+
+    function persist(){
+      persistLocal(true);
+      queueCloudSave();
+    }
+
+    function setCloudStatus(message){
+      const status=$("cloudStatus");
+      if(status)status.textContent=message;
+    }
+
+    function hasMeaningfulLocalState(){
+      return Boolean(
+        tasks.length ||
+        completedPlanKeys.size ||
+        Object.keys(focusTaskSeconds).length ||
+        Object.keys(focusBlockSeconds).length ||
+        Object.keys(manualMoves).length ||
+        focusHistory.length
+      );
+    }
+
+    function serializeCloudState(){
+      return {
+        schemaVersion:1,
+        tasks,
+        settings,
+        completedPlanKeys:[...completedPlanKeys],
+        focusTaskSeconds,
+        focusBlockSeconds,
+        manualMoves,
+        focusHistory,
+        clientUpdatedAt:localRevisionAt||Date.now()
+      };
+    }
+
+    function applyCloudState(data){
+      if(!data||typeof data!=="object")return;
+
+      applyingCloudState=true;
+      try{
+        tasks=Array.isArray(data.tasks)?data.tasks:[];
+        settings=mergeSettings(plainObject(data.settings));
+
+        completedPlanKeys=new Set(
+          Array.isArray(data.completedPlanKeys)?data.completedPlanKeys:[]
+        );
+
+        focusTaskSeconds=plainObject(data.focusTaskSeconds);
+        focusBlockSeconds=plainObject(data.focusBlockSeconds);
+        manualMoves=plainObject(data.manualMoves);
+        focusHistory=Array.isArray(data.focusHistory)
+          ? data.focusHistory.filter(entry=>entry&&entry.completedAt&&Number(entry.seconds)>0)
+          : [];
+
+        const cloudRevision=Number(data.clientUpdatedAt)||Date.now();
+        localRevisionAt=cloudRevision;
+        storageSet(CLOUD_LOCAL_REVISION_KEY,String(localRevisionAt));
+        persistLocal(false);
+
+        renderSettings();
+        renderAll();
+      }finally{
+        applyingCloudState=false;
+      }
+    }
+
+    function userStateReference(uid){
+      if(!firebaseFunctions||!firebaseDb)return null;
+      return firebaseFunctions.doc(
+        firebaseDb,
+        "taskItUpUsers",
+        uid,
+        "data",
+        "appState"
+      );
+    }
+
+    async function saveCloudNow(){
+      if(
+        !firebaseUser ||
+        !firebaseFunctions ||
+        !firebaseDb ||
+        applyingCloudState
+      )return;
+
+      const reference=userStateReference(firebaseUser.uid);
+      if(!reference)return;
+
+      setCloudStatus("Saving…");
+
+      try{
+        await firebaseFunctions.setDoc(
+          reference,
+          {
+            ...serializeCloudState(),
+            updatedAt:firebaseFunctions.serverTimestamp()
+          },
+          {merge:true}
+        );
+        setCloudStatus(`Synced as ${firebaseUser.displayName||firebaseUser.email||"user"}`);
+      }catch(error){
+        console.error("Task-it-up cloud save failed:",error);
+        setCloudStatus("Cloud save failed");
+        showToast("Saved on this device; cloud sync failed");
+      }
+    }
+
+    function queueCloudSave(){
+      if(
+        !firebaseUser ||
+        !firebaseFunctions ||
+        applyingCloudState
+      )return;
+
+      clearTimeout(cloudSaveTimer);
+      cloudSaveTimer=setTimeout(saveCloudNow,700);
+    }
+
+    function stopCloudListener(){
+      if(typeof cloudUnsubscribe==="function"){
+        cloudUnsubscribe();
+      }
+      cloudUnsubscribe=null;
+    }
+
+    async function connectUserToCloud(user){
+      if(!firebaseFunctions||!firebaseDb)return;
+
+      stopCloudListener();
+      const reference=userStateReference(user.uid);
+      setCloudStatus("Checking cloud data…");
+
+      try{
+        const snapshot=await firebaseFunctions.getDoc(reference);
+
+        if(snapshot.exists()){
+          const cloudData=snapshot.data()||{};
+          const cloudRevision=Number(cloudData.clientUpdatedAt)||
+            (cloudData.updatedAt&&typeof cloudData.updatedAt.toMillis==="function"
+              ? cloudData.updatedAt.toMillis()
+              : 0);
+
+          if(hasMeaningfulLocalState()&&localRevisionAt>cloudRevision){
+            await saveCloudNow();
+          }else{
+            applyCloudState(cloudData);
+          }
+        }else{
+          if(!localRevisionAt){
+            localRevisionAt=Date.now();
+            storageSet(CLOUD_LOCAL_REVISION_KEY,String(localRevisionAt));
+          }
+          await saveCloudNow();
+        }
+
+        cloudUnsubscribe=firebaseFunctions.onSnapshot(
+          reference,
+          {includeMetadataChanges:true},
+          snapshotUpdate=>{
+            if(!snapshotUpdate.exists())return;
+            if(snapshotUpdate.metadata.hasPendingWrites)return;
+
+            const data=snapshotUpdate.data()||{};
+            const cloudRevision=Number(data.clientUpdatedAt)||
+              (data.updatedAt&&typeof data.updatedAt.toMillis==="function"
+                ? data.updatedAt.toMillis()
+                : 0);
+
+            if(cloudRevision>localRevisionAt){
+              applyCloudState(data);
+              setCloudStatus(`Synced as ${user.displayName||user.email||"user"}`);
+            }
+          },
+          error=>{
+            console.error("Task-it-up cloud listener failed:",error);
+            setCloudStatus("Cloud connection interrupted");
+          }
+        );
+
+        setCloudStatus(`Synced as ${user.displayName||user.email||"user"}`);
+      }catch(error){
+        console.error("Task-it-up cloud connection failed:",error);
+        setCloudStatus("Cloud connection failed");
+        showToast("Cloud sync could not connect; local saving is still active");
+      }
+    }
+
+    function updateAuthInterface(user){
+      const signInButton=$("signInButton");
+      const signOutButton=$("signOutButton");
+
+      if(user){
+        signInButton.classList.add("hidden");
+        signOutButton.classList.remove("hidden");
+      }else{
+        signInButton.classList.remove("hidden");
+        signOutButton.classList.add("hidden");
+        signInButton.disabled=!firebaseFunctions;
+        signInButton.textContent=firebaseFunctions?"Sign in to sync":"Cloud unavailable";
+        setCloudStatus("Saved on this device");
+      }
+    }
+
+    async function initializeFirebaseSync(){
+      if(firebaseInitializationAttempted)return;
+      firebaseInitializationAttempted=true;
+
+      const signInButton=$("signInButton");
+      signInButton.disabled=true;
+      signInButton.textContent="Connecting…";
+
+      try{
+        const [
+          appModule,
+          authModule,
+          firestoreModule
+        ]=await Promise.all([
+          import("https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js"),
+          import("https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js"),
+          import("https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js")
+        ]);
+
+        const firebaseConfig={
+          apiKey:"AIzaSyCuaNjIupfdDk7vU859WyHmHMY6V2iBCe8",
+          authDomain:"anyone-can-code-7b2b7.firebaseapp.com",
+          projectId:"anyone-can-code-7b2b7",
+          storageBucket:"anyone-can-code-7b2b7.firebasestorage.app",
+          messagingSenderId:"228869534515",
+          appId:"1:228869534515:web:94b7985a0bcd07dbac4446",
+          measurementId:"G-TRC3L35BS0"
+        };
+
+        const firebaseApp=appModule.initializeApp(firebaseConfig);
+        firebaseAuth=authModule.getAuth(firebaseApp);
+        firebaseDb=firestoreModule.getFirestore(firebaseApp);
+
+        const googleProvider=new authModule.GoogleAuthProvider();
+        googleProvider.setCustomParameters({prompt:"select_account"});
+
+        firebaseFunctions={
+          GoogleAuthProvider:authModule.GoogleAuthProvider,
+          signInWithPopup:authModule.signInWithPopup,
+          signOut:authModule.signOut,
+          onAuthStateChanged:authModule.onAuthStateChanged,
+          doc:firestoreModule.doc,
+          getDoc:firestoreModule.getDoc,
+          onSnapshot:firestoreModule.onSnapshot,
+          setDoc:firestoreModule.setDoc,
+          serverTimestamp:firestoreModule.serverTimestamp,
+          googleProvider
+        };
+
+        signInButton.disabled=false;
+        signInButton.textContent="Sign in to sync";
+
+        signInButton.addEventListener("click",async()=>{
+          ensureAudioContext();
+          signInButton.disabled=true;
+          signInButton.textContent="Signing in…";
+          try{
+            await firebaseFunctions.signInWithPopup(
+              firebaseAuth,
+              firebaseFunctions.googleProvider
+            );
+          }catch(error){
+            console.error("Google sign-in failed:",error);
+            showToast(
+              error&&error.code==="auth/popup-blocked"
+                ?"Allow pop-ups and try signing in again"
+                :"Google sign-in failed"
+            );
+          }finally{
+            signInButton.disabled=false;
+            signInButton.textContent="Sign in to sync";
+          }
+        });
+
+        $("signOutButton").addEventListener("click",async()=>{
+          try{
+            await firebaseFunctions.signOut(firebaseAuth);
+            showToast("Signed out; this device will continue saving locally");
+          }catch(error){
+            console.error("Sign-out failed:",error);
+            showToast("Sign-out failed");
+          }
+        });
+
+        firebaseFunctions.onAuthStateChanged(
+          firebaseAuth,
+          async user=>{
+            firebaseUser=user||null;
+            updateAuthInterface(firebaseUser);
+
+            if(firebaseUser){
+              await connectUserToCloud(firebaseUser);
+            }else{
+              stopCloudListener();
+            }
+          }
+        );
+      }catch(error){
+        console.error("Firebase failed to initialize:",error);
+        firebaseFunctions=null;
+        firebaseAuth=null;
+        firebaseDb=null;
+        signInButton.disabled=true;
+        signInButton.textContent="Cloud unavailable";
+        setCloudStatus("Saved on this device");
+      }
     }
 
     function uid(){
@@ -2241,7 +2600,7 @@
       if(panel)panel.classList.add("hidden");
     }
     function resetSavedAppData(){
-      [TASKS_KEY,SETTINGS_KEY,PROGRESS_KEY,FOCUS_TASK_KEY,FOCUS_BLOCK_KEY,MANUAL_MOVES_KEY,FOCUS_HISTORY_KEY,OLD_TASKS_KEY,OLD_SETTINGS_KEY].forEach(storageRemove);
+      [TASKS_KEY,SETTINGS_KEY,PROGRESS_KEY,FOCUS_TASK_KEY,FOCUS_BLOCK_KEY,MANUAL_MOVES_KEY,FOCUS_HISTORY_KEY,CLOUD_LOCAL_REVISION_KEY,OLD_TASKS_KEY,OLD_SETTINGS_KEY].forEach(storageRemove);
       tasks=[];
       settings=mergeSettings({});
       completedPlanKeys=new Set();
@@ -2249,6 +2608,8 @@
       focusBlockSeconds={};
       manualMoves={};
       focusHistory=[];
+      localRevisionAt=Date.now();
+      storageSet(CLOUD_LOCAL_REVISION_KEY,String(localRevisionAt));
       hideFatalError();
       renderSettings();
       renderAll();
@@ -2415,6 +2776,7 @@
     });
 
     try{bootApp();}catch(error){showFatalError(error);}
+    initializeFirebaseSync();
     setInterval(()=>{
       try{
         renderLiveTime();
