@@ -509,6 +509,99 @@
       padding:4px 7px;border-radius:999px;background:#f1f5f9;color:#5b6472;
       font-size:.65rem;font-weight:800
     }
+    .category-chip{
+      display:inline-flex;
+      align-items:center;
+      gap:5px;
+      padding:4px 7px;
+      border-radius:999px;
+      color:#2f3542;
+      font-size:.65rem;
+      font-weight:900;
+      border:1px solid rgba(31,41,55,.08)
+    }
+    .category-dot{
+      width:8px;
+      height:8px;
+      border-radius:50%;
+      flex:0 0 auto
+    }
+    .category-field-row{
+      display:grid;
+      grid-template-columns:minmax(0,1fr) auto;
+      gap:8px;
+      align-items:end
+    }
+    .category-manage-btn{
+      border:1px solid var(--line);
+      background:#fff;
+      color:var(--primary-dark);
+      border-radius:10px;
+      padding:10px 11px;
+      font-size:.72rem;
+      font-weight:900;
+      white-space:nowrap
+    }
+    .category-create-row{
+      display:grid;
+      grid-template-columns:minmax(0,1fr) 110px auto;
+      gap:8px;
+      align-items:end
+    }
+    .category-list{
+      display:grid;
+      gap:8px;
+      margin-top:12px
+    }
+    .category-list-item{
+      display:grid;
+      grid-template-columns:12px minmax(0,1fr) auto;
+      gap:9px;
+      align-items:center;
+      padding:9px 10px;
+      border:1px solid var(--line);
+      border-radius:11px;
+      background:#fff
+    }
+    .category-list-swatch{
+      width:12px;
+      height:12px;
+      border-radius:50%
+    }
+    .category-list-name{
+      min-width:0;
+      font-size:.78rem;
+      font-weight:900;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis
+    }
+    .category-list-count{
+      color:var(--muted);
+      font-size:.66rem;
+      margin-top:2px
+    }
+    .category-delete-btn{
+      border:1px solid #fecaca;
+      background:#fff5f5;
+      color:#b91c1c;
+      border-radius:8px;
+      padding:5px 7px;
+      font-size:.65rem;
+      font-weight:900
+    }
+    .plan-category{
+      display:inline-flex;
+      align-items:center;
+      gap:5px;
+      margin-top:5px;
+      padding:3px 6px;
+      border-radius:999px;
+      font-size:.61rem;
+      font-weight:900;
+      color:#2f3542;
+      border:1px solid rgba(31,41,55,.08)
+    }
     .task-actions{display:flex;gap:5px}
     .tiny-icon{
       width:31px;height:31px;border:1px solid var(--line);border-radius:9px;background:#fff;
@@ -594,6 +687,9 @@
       .progress-overview{grid-template-columns:1fr auto;padding:13px}
       .progress-percent{font-size:1.5rem}
       .field-row{grid-template-columns:1fr}
+      .category-field-row{grid-template-columns:1fr}
+      .category-manage-btn{width:100%}
+      .category-create-row{grid-template-columns:1fr}
       .difficulty-segment{grid-template-columns:1fr}
       .task-card{grid-template-columns:10px 1fr}
       .task-actions{grid-column:2}
@@ -707,6 +803,19 @@
                     <option value="items">items</option>
                   </select>
                 </div>
+              </div>
+
+              <div class="field">
+                <label for="taskCategory">Category</label>
+                <div class="category-field-row">
+                  <select id="taskCategory">
+                    <option value="">No category</option>
+                  </select>
+                  <button class="category-manage-btn" id="manageCategoriesBtn" type="button">
+                    Manage categories
+                  </button>
+                </div>
+                <small>Create categories in Settings, then assign one to each task.</small>
               </div>
 
               <div class="field-row">
@@ -1051,6 +1160,33 @@
       </div>
     </div>
 
+    <div class="settings-card" id="categorySettingsCard">
+      <h3>Task categories</h3>
+      <div class="category-create-row">
+        <div class="field" style="margin:0">
+          <label for="newCategoryName">Category name</label>
+          <input id="newCategoryName" maxlength="40" placeholder="e.g., Teaching" />
+        </div>
+        <div class="field" style="margin:0">
+          <label for="newCategoryColor">Color</label>
+          <select id="newCategoryColor">
+            <option value="#C9C1FA">Violet</option>
+            <option value="#B7D0FC">Blue</option>
+            <option value="#AFE2E4">Aqua</option>
+            <option value="#B9DFC7">Green</option>
+            <option value="#F2DFA5">Yellow</option>
+            <option value="#F3C29F">Orange</option>
+            <option value="#EDB5B7">Red</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" id="addCategoryBtn" type="button">Add</button>
+      </div>
+      <div class="category-list" id="categoryList"></div>
+      <div class="hint" style="margin-top:9px">
+        Deleting a category keeps its tasks but changes them to “No category.”
+      </div>
+    </div>
+
     <div class="settings-card">
       <h3>Cloud sync</h3>
       <div class="hint">
@@ -1118,7 +1254,8 @@
       },
       timerStyle:"digital",
       timerSound:"gentle",
-      theme:"blue"
+      theme:"blue",
+      categories:[]
     };
 
     function mergeSettings(saved={}){
@@ -1134,7 +1271,10 @@
           easy:{...defaultSettings.timer.easy,...(saved.timer?.easy||{})},
           neutral:{...defaultSettings.timer.neutral,...(saved.timer?.neutral||{})},
           difficult:{...defaultSettings.timer.difficult,...(saved.timer?.difficult||{})}
-        }
+        },
+        categories:Array.isArray(saved.categories)
+          ? saved.categories.filter(category=>category&&category.id&&category.name)
+          : []
       };
     }
 
@@ -1203,6 +1343,7 @@
     const els={
       taskForm:$("taskForm"),taskFormPanel:$("taskFormPanel"),editingId:$("editingId"),
       taskName:$("taskName"),notes:$("notes"),amount:$("amount"),unit:$("unit"),
+      taskCategory:$("taskCategory"),
       deadline:$("deadline"),deadlineBlock:$("deadlineBlock"),recurring:$("recurring"),
       recurringFields:$("recurringFields"),frequency:$("frequency"),weekday:$("weekday"),
       weekdayWrap:$("weekdayWrap"),repeatUntil:$("repeatUntil"),allAtOnce:$("allAtOnce"),
@@ -1879,6 +2020,123 @@
       showToast(completedPlanKeys.has(progressKey)?"Work block marked done":"Work block reopened");
     }
 
+    function categoryById(categoryId){
+      return (settings.categories||[]).find(category=>category.id===categoryId)||null;
+    }
+
+    function categoryChipHtml(categoryId,className="category-chip"){
+      const category=categoryById(categoryId);
+      if(!category)return "";
+      return `<span class="${className}" style="background:${escapeHtml(category.color||"#E5E7EB")}">
+        <span class="category-dot" style="background:${escapeHtml(category.color||"#E5E7EB")}"></span>
+        ${escapeHtml(category.name)}
+      </span>`;
+    }
+
+    function renderCategoryControls(){
+      settings.categories=Array.isArray(settings.categories)?settings.categories:[];
+
+      const taskSelect=$("taskCategory");
+      const selectedTaskCategory=taskSelect?taskSelect.value:"";
+      if(taskSelect){
+        taskSelect.innerHTML='<option value="">No category</option>'+
+          settings.categories.map(category=>
+            `<option value="${escapeHtml(category.id)}">${escapeHtml(category.name)}</option>`
+          ).join("");
+        taskSelect.value=settings.categories.some(category=>category.id===selectedTaskCategory)
+          ? selectedTaskCategory
+          : "";
+      }
+
+      const filterSelect=$("filterSelect");
+      if(filterSelect){
+        const selectedFilter=filterSelect.value;
+        filterSelect.querySelectorAll('option[data-category-option="true"]').forEach(option=>option.remove());
+        settings.categories.forEach(category=>{
+          const option=document.createElement("option");
+          option.value=`category:${category.id}`;
+          option.textContent=`Category: ${category.name}`;
+          option.dataset.categoryOption="true";
+          filterSelect.appendChild(option);
+        });
+        filterSelect.value=[...filterSelect.options].some(option=>option.value===selectedFilter)
+          ? selectedFilter
+          : "all";
+      }
+
+      const categoryList=$("categoryList");
+      if(categoryList){
+        categoryList.innerHTML=settings.categories.length
+          ? settings.categories.map(category=>{
+              const count=tasks.filter(task=>task.categoryId===category.id).length;
+              return `
+                <div class="category-list-item">
+                  <span class="category-list-swatch" style="background:${escapeHtml(category.color||"#E5E7EB")}"></span>
+                  <div>
+                    <div class="category-list-name">${escapeHtml(category.name)}</div>
+                    <div class="category-list-count">${count} task${count===1?"":"s"}</div>
+                  </div>
+                  <button class="category-delete-btn" type="button" onclick="deleteCategory('${category.id}')">Delete</button>
+                </div>`;
+            }).join("")
+          : '<div class="hint">No categories yet.</div>';
+      }
+    }
+
+    function addCategory(){
+      const input=$("newCategoryName");
+      const colorInput=$("newCategoryColor");
+      const name=(input.value||"").trim();
+      if(!name){
+        showToast("Enter a category name");
+        input.focus();
+        return;
+      }
+      if((settings.categories||[]).some(category=>category.name.toLowerCase()===name.toLowerCase())){
+        showToast("That category already exists");
+        return;
+      }
+      settings.categories.push({
+        id:uid(),
+        name,
+        color:colorInput.value||"#C9C1FA"
+      });
+      input.value="";
+      persist();
+      renderCategoryControls();
+      renderTasks();
+      renderPlan();
+      showToast("Category added");
+    }
+
+    function deleteCategory(categoryId){
+      const category=categoryById(categoryId);
+      if(!category)return;
+      if(!confirm(`Delete the category "${category.name}"? Tasks will remain.`))return;
+
+      settings.categories=settings.categories.filter(item=>item.id!==categoryId);
+      tasks.forEach(task=>{
+        if(task.categoryId===categoryId)task.categoryId="";
+      });
+      persist();
+      renderCategoryControls();
+      renderTasks();
+      renderPlan();
+      showToast("Category deleted");
+    }
+
+    function openCategorySettings(){
+      els.settingsDrawer.classList.add("open");
+      els.drawerBackdrop.classList.add("open");
+      document.body.style.overflow="hidden";
+      setTimeout(()=>{
+        const card=$("categorySettingsCard");
+        if(card)card.scrollIntoView({behavior:"smooth",block:"start"});
+        const input=$("newCategoryName");
+        if(input)input.focus();
+      },120);
+    }
+
     function planItemHtml(item){
       const d=difficultyKey(item.task);
       const done=isItemDone(item);
@@ -1893,6 +2151,7 @@
           ondragstart="startPlanDrag(event,'${item.progressKey}')" ondragend="endPlanDrag(event)"
           title="Drag this task block to another day or time block">
           <div class="plan-item-title">${escapeHtml(item.task.name)}</div>
+          ${item.task.categoryId?categoryChipHtml(item.task.categoryId,"plan-category"):""}
           <div class="plan-item-row">
             <div class="plan-item-meta">${formatAmount(item.amount)} ${escapeHtml(item.task.unit)} · ${escapeHtml(item.label)}</div>
             <div class="plan-item-actions">
@@ -1940,22 +2199,19 @@
             const state=blockTimeState(globalIndex,block);
             const items=day.blocks[block];
             const remaining=blockRemainingMinutes(globalIndex,block);
-            const statusText=state==="ended"?"Ended":state==="active"?`${formatDurationMinutes(remaining)} left`:blockLabelTime(block);
             const statusClass=state==="ended"?"closed":"";
             return `
               <div class="block-bin">
                 <div class="block-head">
                   <div>
                     <span class="block-title">${BLOCK_LABELS[block]}</span>
-                    <span class="block-status ${statusClass}">${statusText}</span>
-                    <div class="block-meta">${items.filter(isItemDone).length}/${items.length} done · ${formatDurationMinutes(remaining)} open</div>
+                    ${state==="ended"?`<span class="block-status ${statusClass}">Ended</span>`:""}
                   </div>
-                  <button class="redistribute-btn" onclick="redistributeBlock(${globalIndex},'${block}')">Redistribute</button>
                 </div>
                 <div class="block-body" data-day-index="${globalIndex}" data-block="${block}"
                   ondragover="allowPlanDrop(event)" ondragenter="highlightPlanDrop(event)" ondragleave="unhighlightPlanDrop(event)"
                   ondrop="dropPlanItem(event,${globalIndex},'${block}')">
-                  ${items.length?items.map(planItemHtml).join(""):`<div class="empty-slot">${state==="ended"?"Block ended":`${formatDurationMinutes(remaining)} available`}</div>`}
+                  ${items.length?items.map(planItemHtml).join(""):`<div class="empty-slot">${state==="ended"?"Block ended":"Open"}</div>`}
                 </div>
               </div>`;
           }).join("");
@@ -1966,9 +2222,8 @@
               <div class="block-head">
                 <div>
                   <span class="block-title">Daily tasks</span>
-                  <div class="block-meta">${day.items.filter(isItemDone).length}/${day.items.length} done · ${formatDurationMinutes(remaining)} open</div>
+                  
                 </div>
-                <button class="redistribute-btn" onclick="redistributeBlock(${globalIndex},null)">Redistribute</button>
               </div>
               <div class="block-body" data-day-index="${globalIndex}" data-block="day"
                 ondragover="allowPlanDrop(event)" ondragenter="highlightPlanDrop(event)" ondragleave="unhighlightPlanDrop(event)"
@@ -2290,6 +2545,8 @@
       $("difficultyNeutral").checked=true;
       els.amount.value=1;
       els.unit.value="hours";
+      renderCategoryControls();
+      els.taskCategory.value="";
       els.editingId.value="";
       $("formTitle").textContent="Add a task";
       $("saveTaskBtn").textContent="Add task";
@@ -2303,13 +2560,18 @@
       const q=els.searchInput.value.trim().toLowerCase();
       const filter=els.filterSelect.value;
       const filtered=tasks.filter(task=>{
-        const matches=!q||task.name.toLowerCase().includes(q)||(task.notes||"").toLowerCase().includes(q);
-        const category=filter==="all"||
+        const taskCategory=categoryById(task.categoryId);
+        const matches=!q||
+          task.name.toLowerCase().includes(q)||
+          (task.notes||"").toLowerCase().includes(q)||
+          (taskCategory&&taskCategory.name.toLowerCase().includes(q));
+        const categoryMatch=filter==="all"||
           (filter==="deadline"&&task.deadline)||
           (filter==="nodeadline"&&!task.deadline)||
           (filter==="recurring"&&task.recurring)||
-          (filter==="difficult"&&Number(task.motivation)===3);
-        return matches&&category;
+          (filter==="difficult"&&Number(task.motivation)===3)||
+          (filter.startsWith("category:")&&task.categoryId===filter.slice(9));
+        return matches&&categoryMatch;
       }).sort((a,b)=>{
         if(Boolean(a.completed)!==Boolean(b.completed))return a.completed?1:-1;
         if(a.deadline&&b.deadline)return a.deadline.localeCompare(b.deadline);
@@ -2332,6 +2594,7 @@
             <div class="task-name">${escapeHtml(task.name)}</div>
             ${task.notes?`<div class="task-note">${escapeHtml(task.notes)}</div>`:""}
             <div class="chips">
+              ${task.categoryId?categoryChipHtml(task.categoryId):""}
               <span class="chip">${formatAmount(task.amount)} ${escapeHtml(task.unit)}</span>
               <span class="chip">${difficultyText(task)}</span>
               <span class="chip">${task.deadline?`Due ${formatDate(parseDate(task.deadline),{month:"short",day:"numeric"})}`:"No deadline"}</span>
@@ -2364,6 +2627,8 @@
       els.notes.value=task.notes||"";
       els.amount.value=task.amount;
       els.unit.value=task.unit;
+      renderCategoryControls();
+      els.taskCategory.value=task.categoryId||"";
       els.deadline.value=task.deadline||"";
       els.deadlineBlock.value=task.deadlineBlock||"";
       document.querySelector(`input[name="difficulty"][value="${task.motivation||2}"]`).checked=true;
@@ -2418,6 +2683,7 @@
       $("timerStyle").value=settings.timerStyle;
       $("timerSound").value=settings.timerSound||"gentle";
       applyTheme();
+      renderCategoryControls();
     }
 
     function readSettings(){
@@ -2435,7 +2701,7 @@
       };
       settings.timerStyle=$("timerStyle").value;
       settings.timerSound=$("timerSound").value;
-      persist();applyTheme();buildMasterPlan();renderStats();renderTasks();renderTimer();
+      persist();applyTheme();renderCategoryControls();buildMasterPlan();renderStats();renderTasks();renderTimer();
     }
 
     function renderLiveTime(){
@@ -2586,6 +2852,7 @@
     }
 
     function renderAll(){
+      renderCategoryControls();
       buildMasterPlan();
       renderStats();
       renderTasks();
@@ -2643,6 +2910,14 @@
     els.drawerBackdrop.addEventListener("click",closeSettings);
 
     $("openTaskFormBtn").addEventListener("click",()=>openTaskForm(false));
+    $("manageCategoriesBtn").addEventListener("click",openCategorySettings);
+    $("addCategoryBtn").addEventListener("click",addCategory);
+    $("newCategoryName").addEventListener("keydown",event=>{
+      if(event.key==="Enter"){
+        event.preventDefault();
+        addCategory();
+      }
+    });
     $("closeTaskFormBtn").addEventListener("click",closeTaskForm);
     $("cancelEditBtn").addEventListener("click",()=>resetTaskForm(true));
     els.recurring.addEventListener("change",()=>els.recurringFields.classList.toggle("hidden",!els.recurring.checked));
@@ -2658,6 +2933,7 @@
         notes:els.notes.value.trim(),
         amount:Number(els.amount.value),
         unit:els.unit.value,
+        categoryId:els.taskCategory.value||"",
         deadline:els.deadline.value,
         deadlineBlock:els.deadlineBlock.value,
         motivation:Number(document.querySelector('input[name="difficulty"]:checked').value),
@@ -2733,10 +3009,10 @@
     window.unhighlightPlanDrop=unhighlightPlanDrop;
     window.dropPlanItem=dropPlanItem;
     window.togglePlanItemDone=togglePlanItemDone;
-    window.redistributeBlock=redistributeBlock;
     window.toggleTask=toggleTask;
     window.editTask=editTask;
     window.deleteTask=deleteTask;
+    window.deleteCategory=deleteCategory;
 
     $("retryAppBtn").addEventListener("click",()=>{
       try{bootApp();}catch(error){showFatalError(error);}
