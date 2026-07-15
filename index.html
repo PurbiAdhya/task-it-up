@@ -435,8 +435,40 @@
       border:1px solid rgba(var(--primary-rgb),.35);background:var(--primary);color:var(--primary-contrast);
       border-radius:13px;padding:10px 15px;font-weight:900;box-shadow:0 7px 15px rgba(var(--primary-rgb),.18)
     }
+    .task-form-backdrop{
+      position:fixed;
+      inset:0;
+      z-index:24;
+      background:rgba(15,23,42,.46);
+      backdrop-filter:blur(3px);
+      opacity:1;
+      transition:opacity .18s ease
+    }
     .task-form-panel{
-      padding:17px;margin-bottom:14px;background:#fff;border:1px solid var(--line);border-radius:17px
+      position:fixed;
+      z-index:25;
+      left:50%;
+      top:50%;
+      width:min(620px,calc(100vw - 28px));
+      max-height:calc(100vh - 36px);
+      overflow-y:auto;
+      transform:translate(-50%,-50%);
+      padding:20px;
+      margin:0;
+      background:#fff;
+      border:1px solid var(--line);
+      border-radius:20px;
+      box-shadow:0 28px 80px rgba(15,23,42,.28)
+    }
+    .task-form-panel .form-title-row{
+      position:sticky;
+      top:-20px;
+      z-index:2;
+      margin:-20px -20px 16px;
+      padding:17px 20px 13px;
+      background:rgba(255,255,255,.96);
+      border-bottom:1px solid var(--line);
+      backdrop-filter:blur(10px)
     }
     .form-title-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px}
     .form-title-row h3{margin:0}
@@ -695,6 +727,17 @@
       .stat{padding:13px}
       .progress-overview{grid-template-columns:1fr auto;padding:13px}
       .progress-percent{font-size:1.5rem}
+      .task-form-panel{
+        width:calc(100vw - 18px);
+        max-height:calc(100vh - 18px);
+        padding:16px;
+        border-radius:17px
+      }
+      .task-form-panel .form-title-row{
+        top:-16px;
+        margin:-16px -16px 14px;
+        padding:15px 16px 12px
+      }
       .field-row{grid-template-columns:1fr}
       .category-field-row{grid-template-columns:1fr}
       .category-manage-btn{width:100%}
@@ -762,7 +805,14 @@
             </div>
             <button class="add-task-tab-button" id="openTaskFormBtn">+ Add a task</button>
           </div>
-<div id="taskFormPanel" class="task-form-panel hidden">
+<div id="taskFormBackdrop" class="task-form-backdrop hidden"></div>
+<div
+  id="taskFormPanel"
+  class="task-form-panel hidden"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="formTitle"
+>
             <div class="form-title-row">
               <h3 id="formTitle">Add a task</h3>
               <button class="tiny-icon" type="button" id="closeTaskFormBtn" aria-label="Close task form">×</button>
@@ -1212,7 +1262,7 @@
   <div class="fatal-error hidden" id="fatalError">
     <div class="fatal-error-card">
       <h2>Task-it-up could not finish loading</h2>
-      <p id="fatalErrorMessage">Your saved browser data may be unavailable or damaged. You can reopen the app without deleting your task file.</p>
+      <p id="fatalErrorMessage">The app hit a loading error. Your locally saved and Firebase-synced task data has not been deleted.</p>
       <div class="fatal-error-actions">
         <button class="btn btn-primary" id="retryAppBtn" type="button">Try again</button>
         <button class="btn btn-danger" id="resetAppBtn" type="button">Reset saved app data</button>
@@ -1348,7 +1398,8 @@
 
     const $=id=>document.getElementById(id);
     const els={
-      taskForm:$("taskForm"),taskFormPanel:$("taskFormPanel"),editingId:$("editingId"),
+      taskForm:$("taskForm"),taskFormPanel:$("taskFormPanel"),
+      taskFormBackdrop:$("taskFormBackdrop"),editingId:$("editingId"),
       taskName:$("taskName"),notes:$("notes"),amount:$("amount"),unit:$("unit"),
       taskCategory:$("taskCategory"),
       deadline:$("deadline"),deadlineBlock:$("deadlineBlock"),recurring:$("recurring"),
@@ -1781,6 +1832,10 @@
       if(hours)return `${hours}h`;
       return `${mins}m`;
     }
+    function taskTargetMinutes(task){
+      return Math.max(0,itemDurationMinutes(task,task.amount));
+    }
+
     function taskTimeProgress(task){
       const loggedSeconds=Number(focusTaskSeconds[task.id]||0);
       const loggedMinutes=loggedSeconds/60;
@@ -2329,7 +2384,7 @@
     function openCategorySettings(){
       els.settingsDrawer.classList.add("open");
       els.drawerBackdrop.classList.add("open");
-      document.body.style.overflow="hidden";
+      syncBodyScrollLock();
       setTimeout(()=>{
         const card=$("categorySettingsCard");
         if(card)card.scrollIntoView({behavior:"smooth",block:"start"});
@@ -2750,15 +2805,37 @@
       window.scrollTo({top:0,behavior:"smooth"});
     }
 
+    function taskModalIsOpen(){
+      return !els.taskFormPanel.classList.contains("hidden");
+    }
+
+    function syncBodyScrollLock(){
+      const settingsOpen=els.settingsDrawer.classList.contains("open");
+      document.body.style.overflow=(settingsOpen||taskModalIsOpen())?"hidden":"";
+    }
+
+    function showTaskModal(){
+      els.taskFormBackdrop.classList.remove("hidden");
+      els.taskFormPanel.classList.remove("hidden");
+      els.taskFormPanel.scrollTop=0;
+      syncBodyScrollLock();
+      setTimeout(()=>els.taskName.focus(),60);
+    }
+
+    function hideTaskModal(){
+      els.taskFormBackdrop.classList.add("hidden");
+      els.taskFormPanel.classList.add("hidden");
+      syncBodyScrollLock();
+    }
+
     function openTaskForm(editing=false){
       switchView("planView");
-      els.taskFormPanel.classList.remove("hidden");
       if(!editing)resetTaskForm(false);
-      els.taskFormPanel.scrollIntoView({behavior:"smooth",block:"start"});
+      showTaskModal();
     }
 
     function closeTaskForm(){
-      els.taskFormPanel.classList.add("hidden");
+      hideTaskModal();
       resetTaskForm(false);
     }
 
@@ -2775,7 +2852,7 @@
       $("cancelEditBtn").classList.add("hidden");
       els.recurringFields.classList.add("hidden");
       els.weekdayWrap.classList.remove("hidden");
-      if(close)els.taskFormPanel.classList.add("hidden");
+      if(close)hideTaskModal();
     }
 
     function renderTasks(){
@@ -2843,7 +2920,6 @@
       const task=tasks.find(t=>t.id===id);
       if(!task)return;
       switchView("planView");
-      els.taskFormPanel.classList.remove("hidden");
       els.editingId.value=task.id;
       els.taskName.value=task.name;
       els.notes.value=task.notes||"";
@@ -2864,7 +2940,7 @@
       $("formTitle").textContent="Edit task";
       $("saveTaskBtn").textContent="Save changes";
       $("cancelEditBtn").classList.remove("hidden");
-      els.taskFormPanel.scrollIntoView({behavior:"smooth",block:"start"});
+      showTaskModal();
     }
 
     function toggleTask(id){
@@ -3122,17 +3198,18 @@
     $("settingsBtn").addEventListener("click",()=>{
       els.settingsDrawer.classList.add("open");
       els.drawerBackdrop.classList.add("open");
-      document.body.style.overflow="hidden";
+      syncBodyScrollLock();
     });
     function closeSettings(){
       els.settingsDrawer.classList.remove("open");
       els.drawerBackdrop.classList.remove("open");
-      document.body.style.overflow="";
+      syncBodyScrollLock();
     }
     $("closeSettingsBtn").addEventListener("click",closeSettings);
     els.drawerBackdrop.addEventListener("click",closeSettings);
 
     $("openTaskFormBtn").addEventListener("click",()=>openTaskForm(false));
+    els.taskFormBackdrop.addEventListener("click",closeTaskForm);
     $("manageCategoriesBtn").addEventListener("click",openCategorySettings);
     $("addCategoryBtn").addEventListener("click",addCategory);
     $("newCategoryName").addEventListener("keydown",event=>{
@@ -3143,6 +3220,11 @@
     });
     $("closeTaskFormBtn").addEventListener("click",closeTaskForm);
     $("cancelEditBtn").addEventListener("click",()=>resetTaskForm(true));
+    document.addEventListener("keydown",event=>{
+      if(event.key==="Escape"&&taskModalIsOpen()){
+        closeTaskForm();
+      }
+    });
     els.recurring.addEventListener("change",()=>els.recurringFields.classList.toggle("hidden",!els.recurring.checked));
     els.frequency.addEventListener("change",()=>els.weekdayWrap.classList.toggle("hidden",els.frequency.value!=="weekly"));
 
