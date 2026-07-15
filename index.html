@@ -279,6 +279,42 @@
     .plan-icon-btn.timer{
       border:1px solid #fecaca;background:#fff1f2;color:#dc2626
     }
+    .plan-icon-btn.move{
+      border:1px solid #bfdbfe;background:#eff6ff;color:#2563eb;
+      font-size:14px;line-height:1
+    }
+    .move-task-backdrop{
+      position:fixed;inset:0;z-index:26;background:rgba(15,23,42,.42);
+      backdrop-filter:blur(3px)
+    }
+    .move-task-modal{
+      position:fixed;z-index:27;left:50%;top:50%;transform:translate(-50%,-50%);
+      width:min(420px,calc(100vw - 28px));padding:19px;background:#fff;
+      border:1px solid var(--line);border-radius:18px;
+      box-shadow:0 28px 80px rgba(15,23,42,.28)
+    }
+    .move-task-modal h3{margin:0 0 5px}
+    .move-task-modal .hint{margin-bottom:14px}
+    .move-task-actions{display:flex;gap:8px;margin-top:15px}
+    .move-task-actions .btn{flex:1}
+    .unavailable-create-grid{
+      display:grid;grid-template-columns:minmax(0,1fr) 120px;gap:9px
+    }
+    .unavailable-list{display:grid;gap:8px;margin-top:12px}
+    .unavailable-item{
+      display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;
+      border:1px solid var(--line);border-radius:11px;background:#fff;padding:9px 10px
+    }
+    .unavailable-item strong{display:block;font-size:.78rem}
+    .unavailable-item span{display:block;color:var(--muted);font-size:.68rem;margin-top:2px}
+    .unavailable-delete{
+      border:1px solid #fecaca;background:#fff5f5;color:#b91c1c;border-radius:8px;
+      padding:5px 7px;font-size:.65rem;font-weight:900
+    }
+    .unavailable-badge{
+      display:inline-flex;align-items:center;padding:3px 6px;border-radius:999px;
+      background:#f3f4f6;color:#6b7280;font-size:.61rem;font-weight:900;margin-left:5px
+    }
     .redistribute-btn{
       border:1px solid var(--line);background:#fff;color:var(--primary-dark);border-radius:8px;
       padding:4px 7px;font-size:.63rem;font-weight:850;white-space:nowrap
@@ -727,6 +763,8 @@
       .stat{padding:13px}
       .progress-overview{grid-template-columns:1fr auto;padding:13px}
       .progress-percent{font-size:1.5rem}
+      .move-task-modal{width:calc(100vw - 18px)}
+      .unavailable-create-grid{grid-template-columns:1fr}
       .task-form-panel{
         width:calc(100vw - 18px);
         max-height:calc(100vh - 18px);
@@ -1135,6 +1173,38 @@
       </div>
     </div>
 
+    <div class="settings-card" id="unavailableSettingsCard">
+      <h3>Unavailable blocks</h3>
+      <div class="unavailable-create-grid">
+        <div class="field" style="margin:0">
+          <label for="unavailableDate">Date</label>
+          <input id="unavailableDate" type="date" />
+        </div>
+        <div class="field" style="margin:0">
+          <label for="unavailableBlock">Block</label>
+          <select id="unavailableBlock">
+            <option value="morning">Morning</option>
+            <option value="afternoon">Afternoon</option>
+            <option value="evening">Evening</option>
+          </select>
+        </div>
+      </div>
+      <div class="switch-line" style="margin-top:10px">
+        <div class="switch-copy">
+          <strong>Repeat every week</strong>
+          <span>Keep the same weekday and time block unavailable each week.</span>
+        </div>
+        <label class="switch">
+          <input id="unavailableRecurring" type="checkbox" />
+          <span class="slider"></span>
+        </label>
+      </div>
+      <button class="btn btn-primary" id="addUnavailableBtn" type="button" style="width:100%">
+        Add unavailable block
+      </button>
+      <div class="unavailable-list" id="unavailableList"></div>
+    </div>
+
     <div class="settings-card">
       <h3>Block times</h3>
       <div class="settings-row">
@@ -1258,6 +1328,28 @@
     </div>
   </aside>
 
+  <div class="move-task-backdrop hidden" id="moveTaskBackdrop"></div>
+  <div class="move-task-modal hidden" id="moveTaskModal" role="dialog" aria-modal="true" aria-labelledby="moveTaskTitle">
+    <h3 id="moveTaskTitle">Move task</h3>
+    <div class="hint" id="moveTaskDescription">Choose another available day and time block.</div>
+    <div class="field">
+      <label for="moveTaskDate">Day</label>
+      <input id="moveTaskDate" type="date" />
+    </div>
+    <div class="field" id="moveTaskBlockField">
+      <label for="moveTaskBlock">Time block</label>
+      <select id="moveTaskBlock">
+        <option value="morning">Morning</option>
+        <option value="afternoon">Afternoon</option>
+        <option value="evening">Evening</option>
+      </select>
+    </div>
+    <div class="move-task-actions">
+      <button class="btn btn-ghost" id="cancelMoveTaskBtn" type="button">Cancel</button>
+      <button class="btn btn-primary" id="confirmMoveTaskBtn" type="button">Move</button>
+    </div>
+  </div>
+
   <div class="toast" id="toast"></div>
   <div class="fatal-error hidden" id="fatalError">
     <div class="fatal-error-card">
@@ -1309,7 +1401,8 @@
       timerStyle:"digital",
       timerSound:"gentle",
       theme:"blue",
-      categories:[]
+      categories:[],
+      unavailableBlocks:[]
     };
 
     function mergeSettings(saved={}){
@@ -1328,6 +1421,12 @@
         },
         categories:Array.isArray(saved.categories)
           ? saved.categories.filter(category=>category&&category.id&&category.name)
+          : [],
+        unavailableBlocks:Array.isArray(saved.unavailableBlocks)
+          ? saved.unavailableBlocks.filter(rule=>
+              rule&&rule.id&&rule.block&&
+              (rule.date||Number.isInteger(rule.weekday))
+            )
           : []
       };
     }
@@ -1395,6 +1494,7 @@
     const MAX_DAY_MINUTES=12*60;
     const MAX_BLOCK_MINUTES=4*60;
     let unscheduledWork=[];
+    let activeMoveProgressKey=null;
 
     const $=id=>document.getElementById(id);
     const els={
@@ -1408,7 +1508,9 @@
       taskList:$("taskList"),searchInput:$("searchInput"),filterSelect:$("filterSelect"),
       settingsDrawer:$("settingsDrawer"),drawerBackdrop:$("drawerBackdrop"),toast:$("toast"),
       divideBlocksSetting:$("divideBlocksSetting"),highEnergyBlock:$("highEnergyBlock"),
-      scheduleGrid:$("scheduleGrid")
+      scheduleGrid:$("scheduleGrid"),
+      moveTaskBackdrop:$("moveTaskBackdrop"),moveTaskModal:$("moveTaskModal"),
+      moveTaskDate:$("moveTaskDate"),moveTaskBlock:$("moveTaskBlock")
     };
 
     function persistLocal(updateRevision=true){
@@ -1880,7 +1982,24 @@
     function blockStarted(dayIndex,block){
       return blockTimeState(dayIndex,block)==="active";
     }
+    function unavailableRuleMatches(rule,date,block){
+      if(!rule||rule.block!==block)return false;
+      if(rule.recurring){
+        return Number(rule.weekday)===date.getDay();
+      }
+      return rule.date===dateKey(date);
+    }
+
+    function isBlockUnavailable(dayIndex,block){
+      const day=masterPlan[dayIndex];
+      if(!day)return false;
+      return (settings.unavailableBlocks||[]).some(rule=>
+        unavailableRuleMatches(rule,day.date,block)
+      );
+    }
+
     function blockBaseMinutes(dayIndex,block){
+      if(isBlockUnavailable(dayIndex,block))return 0;
       const start=timeToMinutes(settings.blockTimes[block].start);
       const end=timeToMinutes(settings.blockTimes[block].end);
       const configured=Math.max(0,end-start);
@@ -2028,12 +2147,12 @@
       return best;
     }
 
-    function addScheduledItem(slot,task,amount,label,instanceId,dueDate=null){
+    function addScheduledItem(slot,task,amount,label,instanceId,dueDate=null,windowStart=null){
       if(!slot)return false;
       const item={
         id:`${instanceId}-${slot.dayIndex}-${slot.block}-${label}`,
         progressKey:`${instanceId}|${label}`,
-        instanceId,task,amount,label,block:slot.block,dueDate,
+        instanceId,task,amount,label,block:slot.block,dueDate,windowStart,
         weight:effortWeight(task,amount)
       };
       const day=masterPlan[slot.dayIndex];
@@ -2127,7 +2246,7 @@
             ? "Task block"
             : `Part ${index+1} of ${chunkMinutes.length}`;
 
-        if(addScheduledItem(slot,task,amount,label,instanceId,dueDate)){
+        if(addScheduledItem(slot,task,amount,label,instanceId,dueDate,windowStart)){
           scheduledMinutes+=minutes;
         }
       });
@@ -2166,7 +2285,7 @@
       return dates;
     }
 
-    function buildMasterPlan(){
+    function buildMasterPlan({rebalance=false}={}){
       const horizonDays=Math.max(90,(weekOffset+2)*7);
       const start=todayStart();
       masterPlan=Array.from(
@@ -2238,8 +2357,115 @@
         );
       });
 
-      applyManualMoves();
+      if(rebalance){
+        rebalanceScheduledItems();
+      }else{
+        applyManualMoves();
+      }
       renderPlan();
+    }
+
+    function resetPlanContainers(){
+      masterPlan.forEach(day=>{
+        day.load=0;
+        day.items=[];
+        day.blocks={morning:[],afternoon:[],evening:[]};
+      });
+    }
+
+    function rebalanceCandidateScore(dayIndex,block,item){
+      const day=masterPlan[dayIndex];
+      const dayUsed=usedDayMinutes(day);
+      const dayCapacity=Math.max(1,dayCapacityMinutes(dayIndex));
+
+      if(!settings.divideBlocks){
+        return dayUsed/dayCapacity;
+      }
+
+      const blockUsed=usedBlockMinutes(day,block);
+      const blockCapacity=Math.max(1,blockBaseMinutes(dayIndex,block));
+      const blockRatio=blockUsed/blockCapacity;
+      const dayRatio=dayUsed/dayCapacity;
+
+      let score=blockRatio*10+dayRatio*3;
+
+      if(
+        difficultyKey(item.task)==="difficult"&&
+        block===settings.highEnergyBlock
+      ){
+        score-=0.15;
+      }
+
+      return score;
+    }
+
+    function rebalanceScheduledItems(){
+      const items=masterPlan.flatMap(day=>day.items).map(item=>({...item}));
+
+      items.sort((a,b)=>{
+        const aDue=a.dueDate||parseDate(a.task.deadline)||masterPlan[masterPlan.length-1].date;
+        const bDue=b.dueDate||parseDate(b.task.deadline)||masterPlan[masterPlan.length-1].date;
+        const dueDifference=aDue-bDue;
+        if(dueDifference!==0)return dueDifference;
+        return itemDurationMinutes(b.task,b.amount)-itemDurationMinutes(a.task,a.amount);
+      });
+
+      resetPlanContainers();
+      unscheduledWork=[];
+
+      items.forEach(item=>{
+        const deadline=item.dueDate||parseDate(item.task.deadline)||masterPlan[masterPlan.length-1].date;
+        const firstIndex=clamp(
+          Math.floor(((item.windowStart||todayStart())-todayStart())/86400000),
+          0,
+          masterPlan.length-1
+        );
+        const lastIndex=clamp(
+          Math.floor((deadline-todayStart())/86400000),
+          0,
+          masterPlan.length-1
+        );
+
+        let best=null;
+
+        for(let dayIndex=firstIndex;dayIndex<=lastIndex;dayIndex++){
+          const dueDay=sameDay(masterPlan[dayIndex].date,deadline);
+          const blocks=availableBlocks(
+            dayIndex,
+            item.task,
+            dueDay,
+            item.amount,
+            null
+          );
+
+          for(const block of blocks){
+            const score=rebalanceCandidateScore(dayIndex,block,item);
+            if(
+              !best||
+              score<best.score||
+              (score===best.score&&dayIndex>best.dayIndex)
+            ){
+              best={dayIndex,block,score};
+            }
+          }
+        }
+
+        if(!best){
+          unscheduledWork.push({
+            taskId:item.task.id,
+            taskName:item.task.name,
+            minutes:itemDurationMinutes(item.task,item.amount),
+            dueDate:deadline
+          });
+          return;
+        }
+
+        item.block=best.block;
+        const target=masterPlan[best.dayIndex];
+        target.items.push(item);
+        target.load+=item.weight;
+        if(settings.divideBlocks)target.blocks[best.block].push(item);
+      });
     }
 
     function currentViewDays(){
@@ -2274,6 +2500,91 @@
       persist();
       renderPlan();renderStats();renderTasks();renderProgress();renderTimer();
       showToast(completedPlanKeys.has(progressKey)?"Work block marked done":"Work block reopened");
+    }
+
+    function renderUnavailableBlocks(){
+      settings.unavailableBlocks=Array.isArray(settings.unavailableBlocks)
+        ? settings.unavailableBlocks
+        : [];
+
+      const list=$("unavailableList");
+      if(!list)return;
+
+      list.innerHTML=settings.unavailableBlocks.length
+        ? settings.unavailableBlocks
+            .slice()
+            .sort((a,b)=>{
+              if(Boolean(a.recurring)!==Boolean(b.recurring))return a.recurring?1:-1;
+              return String(a.date||a.weekday).localeCompare(String(b.date||b.weekday));
+            })
+            .map(rule=>{
+              const dateText=rule.recurring
+                ? `Every ${weekdayName(Number(rule.weekday))}`
+                : formatDate(parseDate(rule.date),{weekday:"short",month:"short",day:"numeric"});
+
+              return `
+                <div class="unavailable-item">
+                  <div>
+                    <strong>${dateText} · ${BLOCK_LABELS[rule.block]}</strong>
+                    <span>${rule.recurring?"Repeats weekly":"One-time unavailable block"}</span>
+                  </div>
+                  <button class="unavailable-delete" type="button" onclick="deleteUnavailableBlock('${rule.id}')">Delete</button>
+                </div>`;
+            }).join("")
+        : '<div class="hint">No unavailable blocks added.</div>';
+    }
+
+    function weekdayName(day){
+      return ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][day]||"";
+    }
+
+    function addUnavailableBlock(){
+      const dateValue=$("unavailableDate").value;
+      const block=$("unavailableBlock").value;
+      const recurring=$("unavailableRecurring").checked;
+
+      if(!dateValue){
+        showToast("Choose a date");
+        return;
+      }
+
+      const date=parseDate(dateValue);
+      const rule={
+        id:uid(),
+        block,
+        recurring,
+        date:recurring?"":dateValue,
+        weekday:recurring?date.getDay():null
+      };
+
+      const duplicate=(settings.unavailableBlocks||[]).some(existing=>
+        existing.block===rule.block&&
+        Boolean(existing.recurring)===Boolean(rule.recurring)&&
+        (
+          rule.recurring
+            ? Number(existing.weekday)===Number(rule.weekday)
+            : existing.date===rule.date
+        )
+      );
+
+      if(duplicate){
+        showToast("That unavailable block already exists");
+        return;
+      }
+
+      settings.unavailableBlocks.push(rule);
+      persist();
+      renderUnavailableBlocks();
+      buildMasterPlan();
+      showToast("Unavailable block added");
+    }
+
+    function deleteUnavailableBlock(ruleId){
+      settings.unavailableBlocks=(settings.unavailableBlocks||[]).filter(rule=>rule.id!==ruleId);
+      persist();
+      renderUnavailableBlocks();
+      buildMasterPlan();
+      showToast("Unavailable block removed");
     }
 
     function categoryById(categoryId){
@@ -2432,6 +2743,12 @@
                   <path d="M12 9v4l2.5 1.5M9 2h6M12 2v3"></path>
                 </svg>
               </button>
+              <button
+                class="plan-icon-btn move"
+                onclick="openMoveTask('${item.progressKey}')"
+                title="Move task"
+                aria-label="Move task"
+              >📅</button>
             </div>
           </div>
           <div class="time-progress">
@@ -2482,13 +2799,14 @@
                 <div class="block-head block-head-${block}">
                   <div>
                     <span class="block-title">${BLOCK_LABELS[block]}</span>
-                    ${state==="ended"?`<span class="block-status ${statusClass}">Ended</span>`:""}
+                    ${isBlockUnavailable(globalIndex,block)?'<span class="unavailable-badge">Unavailable</span>':""}
+                    ${state==="ended"&&!isBlockUnavailable(globalIndex,block)?`<span class="block-status ${statusClass}">Ended</span>`:""}
                   </div>
                 </div>
                 <div class="block-body" data-day-index="${globalIndex}" data-block="${block}"
                   ondragover="allowPlanDrop(event)" ondragenter="highlightPlanDrop(event)" ondragleave="unhighlightPlanDrop(event)"
                   ondrop="dropPlanItem(event,${globalIndex},'${block}')">
-                  ${items.length?items.map(planItemHtml).join(""):`<div class="empty-slot">${state==="ended"?"Block ended":"Open"}</div>`}
+                  ${items.length?items.map(planItemHtml).join(""):`<div class="empty-slot">${isBlockUnavailable(globalIndex,block)?"Unavailable":state==="ended"?"Block ended":"Open"}</div>`}
                 </div>
               </div>`;
           }).join("");
@@ -2584,6 +2902,100 @@
         movePlanItem(progressKey,index,block,{remember:false,render:false,notify:false});
       });
     }
+    function closeMoveTask(){
+      activeMoveProgressKey=null;
+      els.moveTaskBackdrop.classList.add("hidden");
+      els.moveTaskModal.classList.add("hidden");
+      syncBodyScrollLock();
+    }
+
+    function moveModalIsOpen(){
+      return !els.moveTaskModal.classList.contains("hidden");
+    }
+
+    function refreshMoveBlockOptions(){
+      const located=findPlanItem(activeMoveProgressKey);
+      if(!located)return;
+      const date=parseDate(els.moveTaskDate.value);
+      if(!date)return;
+      const dayIndex=masterPlan.findIndex(day=>sameDay(day.date,date));
+      if(dayIndex<0)return;
+
+      if(!settings.divideBlocks){
+        $("moveTaskBlockField").classList.add("hidden");
+        return;
+      }
+
+      $("moveTaskBlockField").classList.remove("hidden");
+      const item=located.item;
+      const deadline=item.dueDate||parseDate(item.task.deadline);
+      const dueDay=deadline?sameDay(date,deadline):false;
+      const blocks=availableBlocks(
+        dayIndex,
+        item.task,
+        dueDay,
+        item.amount,
+        item.id
+      );
+
+      els.moveTaskBlock.innerHTML=BLOCKS.map(block=>{
+        const disabled=!blocks.includes(block);
+        const unavailable=isBlockUnavailable(dayIndex,block);
+        const label=unavailable
+          ? `${BLOCK_LABELS[block]} — unavailable`
+          : disabled
+            ? `${BLOCK_LABELS[block]} — no room`
+            : BLOCK_LABELS[block];
+
+        return `<option value="${block}" ${disabled?"disabled":""}>${label}</option>`;
+      }).join("");
+
+      const firstAvailable=blocks[0];
+      if(firstAvailable)els.moveTaskBlock.value=firstAvailable;
+    }
+
+    function openMoveTask(progressKey){
+      const located=findPlanItem(progressKey);
+      if(!located)return;
+
+      activeMoveProgressKey=progressKey;
+      const item=located.item;
+      const deadline=item.dueDate||parseDate(item.task.deadline);
+      const minimum=todayStart();
+      const maximum=deadline||masterPlan[masterPlan.length-1].date;
+
+      els.moveTaskDate.min=dateKey(minimum);
+      els.moveTaskDate.max=dateKey(maximum);
+      els.moveTaskDate.value=dateKey(located.day.date);
+      $("moveTaskDescription").textContent=`Move “${item.task.name}” to another available place before its deadline.`;
+
+      refreshMoveBlockOptions();
+      els.moveTaskBackdrop.classList.remove("hidden");
+      els.moveTaskModal.classList.remove("hidden");
+      syncBodyScrollLock();
+    }
+
+    function confirmMoveTask(){
+      if(!activeMoveProgressKey)return;
+
+      const targetDate=parseDate(els.moveTaskDate.value);
+      if(!targetDate){
+        showToast("Choose a day");
+        return;
+      }
+
+      const targetDayIndex=masterPlan.findIndex(day=>sameDay(day.date,targetDate));
+      if(targetDayIndex<0){
+        showToast("That day is outside the current planning range");
+        return;
+      }
+
+      const block=settings.divideBlocks?els.moveTaskBlock.value:"day";
+      if(movePlanItem(activeMoveProgressKey,targetDayIndex,block)){
+        closeMoveTask();
+      }
+    }
+
     function startPlanDrag(event,progressKey){
       event.dataTransfer.setData("text/plain",progressKey);
       event.dataTransfer.effectAllowed="move";
@@ -2811,7 +3223,11 @@
 
     function syncBodyScrollLock(){
       const settingsOpen=els.settingsDrawer.classList.contains("open");
-      document.body.style.overflow=(settingsOpen||taskModalIsOpen())?"hidden":"";
+      document.body.style.overflow=(
+        settingsOpen||
+        taskModalIsOpen()||
+        moveModalIsOpen()
+      )?"hidden":"";
     }
 
     function showTaskModal(){
@@ -2982,6 +3398,10 @@
       $("timerSound").value=settings.timerSound||"gentle";
       applyTheme();
       renderCategoryControls();
+      renderUnavailableBlocks();
+      if(!$("unavailableDate").value){
+        $("unavailableDate").value=dateKey(todayStart());
+      }
     }
 
     function readSettings(){
@@ -3210,6 +3630,11 @@
 
     $("openTaskFormBtn").addEventListener("click",()=>openTaskForm(false));
     els.taskFormBackdrop.addEventListener("click",closeTaskForm);
+    els.moveTaskBackdrop.addEventListener("click",closeMoveTask);
+    $("cancelMoveTaskBtn").addEventListener("click",closeMoveTask);
+    $("confirmMoveTaskBtn").addEventListener("click",confirmMoveTask);
+    els.moveTaskDate.addEventListener("change",refreshMoveBlockOptions);
+    $("addUnavailableBtn").addEventListener("click",addUnavailableBlock);
     $("manageCategoriesBtn").addEventListener("click",openCategorySettings);
     $("addCategoryBtn").addEventListener("click",addCategory);
     $("newCategoryName").addEventListener("keydown",event=>{
@@ -3223,6 +3648,8 @@
     document.addEventListener("keydown",event=>{
       if(event.key==="Escape"&&taskModalIsOpen()){
         closeTaskForm();
+      }else if(event.key==="Escape"&&moveModalIsOpen()){
+        closeMoveTask();
       }
     });
     els.recurring.addEventListener("change",()=>els.recurringFields.classList.toggle("hidden",!els.recurring.checked));
@@ -3269,10 +3696,14 @@
     $("rebalanceBtn").addEventListener("click",()=>{
       manualMoves={};
       persist();
-      buildMasterPlan();
+      buildMasterPlan({rebalance:true});
       renderStats();
       renderTasks();
-      showToast("Plan rebalanced by deadline");
+      showToast(
+        settings.divideBlocks
+          ?"Balanced across available time blocks"
+          :"Balanced across available days"
+      );
     });
 
     $("timerStartPauseBtn").addEventListener("click",()=>{
@@ -3325,6 +3756,8 @@
     window.editTask=editTask;
     window.deleteTask=deleteTask;
     window.deleteCategory=deleteCategory;
+    window.openMoveTask=openMoveTask;
+    window.deleteUnavailableBlock=deleteUnavailableBlock;
 
     $("retryAppBtn").addEventListener("click",()=>{
       try{bootApp();}catch(error){showFatalError(error);}
