@@ -229,6 +229,9 @@
       display:flex;align-items:center;justify-content:space-between;gap:9px;padding:9px 10px;
       background:#f8fafc;border-bottom:1px solid var(--line)
     }
+    .block-head-morning{background:#FFF7D9}
+    .block-head-afternoon{background:#E8F7F3}
+    .block-head-evening{background:#F0EDFF}
     .block-title{font-size:.79rem;font-weight:900}
     .block-meta{font-size:.69rem;color:var(--muted);font-weight:700}
     .block-status{
@@ -250,7 +253,6 @@
     .plan-item[draggable="true"]{cursor:grab}
     .plan-item.dragging{opacity:.42;cursor:grabbing}
     .block-body.drag-over{background:var(--primary-soft);outline:2px dashed var(--primary);outline-offset:-4px}
-    .drag-hint{font-size:.61rem;color:var(--muted);font-weight:750;margin-top:5px}
     .time-progress{margin-top:8px}
     .time-progress-copy{display:flex;justify-content:space-between;gap:8px;font-size:.65rem;color:var(--muted);font-weight:780;margin-bottom:4px}
     .time-progress-track{height:6px;background:#e5e7eb;border-radius:999px;overflow:hidden}
@@ -261,21 +263,28 @@
       display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px;flex-wrap:wrap
     }
     .plan-item-meta{font-size:.69rem;color:var(--muted)}
-    .plan-item-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
-    .start-timer-btn{
-      border:1px solid rgba(var(--primary-rgb),.28);background:var(--primary-soft);color:var(--primary-dark);
-      border-radius:8px;padding:4px 7px;font-size:.64rem;font-weight:900;white-space:nowrap
+    .plan-item-actions{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+    .plan-icon-btn{
+      width:30px;height:30px;border-radius:9px;display:grid;place-items:center;
+      padding:0;background:#fff;transition:.16s ease
     }
-    .complete-block-btn{
-      border:1px solid #bbf7d0;background:#f0fdf4;color:#15803d;border-radius:8px;
-      padding:4px 7px;font-size:.64rem;font-weight:900;white-space:nowrap
+    .plan-icon-btn:hover{transform:translateY(-1px)}
+    .plan-icon-btn svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+    .plan-icon-btn.complete{
+      border:1px solid #86efac;background:#f0fdf4;color:#15803d
     }
-    .complete-block-btn.undo{border-color:#d1d5db;background:#fff;color:#4b5563}
+    .plan-icon-btn.complete.done{
+      border-color:#16a34a;background:#16a34a;color:#fff
+    }
+    .plan-icon-btn.timer{
+      border:1px solid #fecaca;background:#fff1f2;color:#dc2626
+    }
     .redistribute-btn{
       border:1px solid var(--line);background:#fff;color:var(--primary-dark);border-radius:8px;
       padding:4px 7px;font-size:.63rem;font-weight:850;white-space:nowrap
     }
     .empty-slot{font-size:.72rem;color:var(--muted);padding:4px}
+    .footer-note:empty{display:none}
     .footer-note{font-size:.75rem;color:var(--muted);line-height:1.45;margin-top:12px}
 
     .timer-panel{text-align:center;min-height:540px;display:grid;place-items:center}
@@ -788,19 +797,14 @@
 
               <div class="field-row">
                 <div class="field">
-                  <label for="amount">Amount *</label>
+                  <label for="amount">Time required *</label>
                   <input id="amount" type="number" min=".25" step=".25" value="1" required />
                 </div>
                 <div class="field">
-                  <label for="unit">Unit</label>
+                  <label for="unit">Time unit</label>
                   <select id="unit">
                     <option value="hours">hours</option>
                     <option value="minutes">minutes</option>
-                    <option value="meals">meals</option>
-                    <option value="pages">pages</option>
-                    <option value="problems">problems</option>
-                    <option value="sessions">sessions</option>
-                    <option value="items">items</option>
                   </select>
                 </div>
               </div>
@@ -1338,6 +1342,9 @@
 
     const BLOCKS=["morning","afternoon","evening"];
     const BLOCK_LABELS={morning:"Morning",afternoon:"Afternoon",evening:"Evening"};
+    const MAX_DAY_MINUTES=12*60;
+    const MAX_BLOCK_MINUTES=4*60;
+    let unscheduledWork=[];
 
     const $=id=>document.getElementById(id);
     const els={
@@ -1410,6 +1417,7 @@
       try{
         tasks=Array.isArray(data.tasks)?data.tasks:[];
         settings=mergeSettings(plainObject(data.settings));
+        normalizeLegacyTimeTasks();
 
         completedPlanKeys=new Set(
           Array.isArray(data.completedPlanKeys)?data.completedPlanKeys:[]
@@ -1727,22 +1735,43 @@
       return key==="difficult"?"Avoiding it":key==="neutral"?"Neutral":"Want to";
     }
     function effortWeight(task,amount=task.amount){
-      const n=Number(amount)||0;
-      if(task.unit==="minutes")return n/60;
-      if(task.unit==="hours")return n;
-      return Math.max(.35,n*.5);
+      return itemDurationMinutes(task,amount)/60;
     }
-    function taskTargetMinutes(task){
-      const amount=Number(task.amount)||0;
-      if(task.unit==="hours")return amount*60;
-      if(task.unit==="minutes")return amount;
-      return null;
-    }
+
     function itemDurationMinutes(task,amount=task.amount){
-      const n=Number(amount)||0;
+      const n=Math.max(0,Number(amount)||0);
       if(task.unit==="hours")return n*60;
       if(task.unit==="minutes")return n;
-      return effortWeight(task,n)*60;
+      // Legacy non-time units from earlier builds were estimated at 30 minutes each.
+      return n*30;
+    }
+
+    function taskAmountFromMinutes(task,minutes){
+      const safeMinutes=Math.max(0,Number(minutes)||0);
+      return task.unit==="hours"
+        ? Math.round((safeMinutes/60)*100)/100
+        : Math.round(safeMinutes);
+    }
+
+    function formatTaskDuration(task,amount=task.amount){
+      return formatDurationMinutes(itemDurationMinutes(task,amount));
+    }
+
+    function normalizeLegacyTimeTasks(){
+      let changed=false;
+      tasks.forEach(task=>{
+        if(task.unit==="hours"||task.unit==="minutes")return;
+        const minutes=Math.max(1,Math.round(itemDurationMinutes(task,task.amount)));
+        if(minutes%60===0){
+          task.amount=minutes/60;
+          task.unit="hours";
+        }else{
+          task.amount=minutes;
+          task.unit="minutes";
+        }
+        changed=true;
+      });
+      return changed;
     }
     function formatDurationMinutes(minutes){
       const rounded=Math.max(0,Math.round(Number(minutes)||0));
@@ -1771,12 +1800,9 @@
       return {loggedMinutes,targetMinutes,percent};
     }
 
-    function desiredChunks(task){
-      const amount=Number(task.amount)||1;
-      if(task.allAtOnce)return 1;
-      if(task.unit==="minutes")return Math.max(1,Math.ceil(amount/30));
-      if(task.unit==="hours")return Math.max(1,Math.ceil(amount));
-      return Math.max(1,Math.ceil(amount));
+    function minimumFocusChunkMinutes(task){
+      const preset=settings.timer[difficultyKey(task)]||settings.timer.neutral;
+      return Math.max(10,Number(preset.focus)||30);
     }
 
     function timeToMinutes(value){
@@ -1802,33 +1828,64 @@
     function blockBaseMinutes(dayIndex,block){
       const start=timeToMinutes(settings.blockTimes[block].start);
       const end=timeToMinutes(settings.blockTimes[block].end);
-      if(dayIndex>0)return Math.max(0,end-start);
+      const configured=Math.max(0,end-start);
+      const cappedConfigured=Math.min(MAX_BLOCK_MINUTES,configured);
+      if(dayIndex>0)return cappedConfigured;
       const now=minutesNow();
       if(now>=end)return 0;
-      return Math.max(0,end-Math.max(now,start));
+      const actualRemaining=Math.max(0,end-Math.max(now,start));
+      return Math.min(MAX_BLOCK_MINUTES,actualRemaining);
     }
+
     function blockLabelTime(block){
       const t=settings.blockTimes[block];
       return `${formatClockTime(t.start)}–${formatClockTime(t.end)}`;
     }
+
     function formatClockTime(value){
       const [h,m]=value.split(":").map(Number);
       const d=new Date();d.setHours(h,m,0,0);
       return d.toLocaleTimeString(undefined,{hour:"numeric",minute:m?"2-digit":undefined});
     }
+
     function usedBlockMinutes(day,block,excludeItemId=null){
       const items=block==="day"?day.items:day.blocks[block];
       return items
-        .filter(item=>item.id!==excludeItemId&&!isItemDone(item))
+        .filter(item=>item.id!==excludeItemId)
         .reduce((sum,item)=>sum+itemDurationMinutes(item.task,item.amount),0);
     }
+
+    function usedDayMinutes(day,excludeItemId=null){
+      return day.items
+        .filter(item=>item.id!==excludeItemId)
+        .reduce((sum,item)=>sum+itemDurationMinutes(item.task,item.amount),0);
+    }
+
+    function dayCapacityMinutes(dayIndex){
+      const availableFromBlocks=BLOCKS.reduce(
+        (sum,block)=>sum+blockBaseMinutes(dayIndex,block),
+        0
+      );
+      return Math.min(MAX_DAY_MINUTES,availableFromBlocks);
+    }
+
     function blockRemainingMinutes(dayIndex,block,excludeItemId=null){
       const day=masterPlan[dayIndex];
       if(!day)return 0;
-      if(block==="day"){
-        return BLOCKS.reduce((sum,b)=>sum+blockBaseMinutes(dayIndex,b),0)-usedBlockMinutes(day,"day",excludeItemId);
-      }
-      return Math.max(0,blockBaseMinutes(dayIndex,block)-usedBlockMinutes(day,block,excludeItemId));
+
+      const dayRemaining=Math.max(
+        0,
+        dayCapacityMinutes(dayIndex)-usedDayMinutes(day,excludeItemId)
+      );
+
+      if(block==="day")return dayRemaining;
+
+      const blockRemaining=Math.max(
+        0,
+        blockBaseMinutes(dayIndex,block)-usedBlockMinutes(day,block,excludeItemId)
+      );
+
+      return Math.min(dayRemaining,blockRemaining);
     }
     function dayAvailable(dayIndex,task=null,amount=null){
       if(!settings.divideBlocks)return blockRemainingMinutes(dayIndex,"day")>0;
@@ -1863,8 +1920,17 @@
       return day.blocks[block].reduce((sum,item)=>sum+item.weight,0);
     }
 
-    function chooseSlot(dayIndices,task,dueDate=null,afterBlock=null,amount=task.amount,excludeItemId=null){
+    function chooseSlot(
+      dayIndices,
+      task,
+      dueDate=null,
+      afterBlock=null,
+      amount=task.amount,
+      excludeItemId=null,
+      targetDayIndex=null
+    ){
       let best=null;
+
       for(const dayIndex of dayIndices){
         if(dayIndex<0||dayIndex>=masterPlan.length)continue;
         const day=masterPlan[dayIndex];
@@ -1878,13 +1944,32 @@
         for(const block of blocks){
           const remaining=blockRemainingMinutes(dayIndex,block,excludeItemId);
           const capacity=Math.max(1,blockBaseMinutes(dayIndex,block));
-          const utilization=1-remaining/capacity;
-          let score=day.load+blockLoad(day,block)*.8+utilization+dayIndex*.006;
-          if(difficultyKey(task)==="difficult"&&block===settings.highEnergyBlock)score-=.45;
-          if(dueDay&&task.deadlineBlock)score-=.08;
-          if(!best||score<best.score)best={dayIndex,block,score};
+          const blockUtilization=1-remaining/capacity;
+          const dayUtilization=usedDayMinutes(day,excludeItemId)/MAX_DAY_MINUTES;
+
+          let score=blockUtilization*8+dayUtilization*12;
+
+          if(targetDayIndex!==null){
+            const distance=Math.abs(dayIndex-targetDayIndex);
+            score+=distance*100;
+            // At equal distance, move later-deadline work later rather than earlier.
+            if(dayIndex<targetDayIndex)score+=15;
+          }else{
+            score+=dayIndex*.01;
+          }
+
+          if(difficultyKey(task)==="difficult"&&block===settings.highEnergyBlock){
+            score-=4;
+          }
+
+          if(dueDay&&task.deadlineBlock)score-=1;
+
+          if(!best||score<best.score){
+            best={dayIndex,block,score};
+          }
         }
       }
+
       return best;
     }
 
@@ -1904,30 +1989,102 @@
     }
 
     function scheduleInstance(task,windowStart,dueDate,instanceId){
-      const first=clamp(Math.floor((windowStart-todayStart())/86400000),0,masterPlan.length-1);
-      const last=clamp(Math.floor((dueDate-todayStart())/86400000),0,masterPlan.length-1);
+      const first=clamp(
+        Math.floor((windowStart-todayStart())/86400000),
+        0,
+        masterPlan.length-1
+      );
+      const last=clamp(
+        Math.floor((dueDate-todayStart())/86400000),
+        0,
+        masterPlan.length-1
+      );
+
       if(last<0||first>=masterPlan.length)return;
 
-      const total=Number(task.amount)||1;
-      const requestedChunks=task.allAtOnce?1:desiredChunks(task);
-      const chunks=Math.max(1,requestedChunks);
-      const amounts=[];
-      let remaining=total;
-      for(let i=0;i<chunks;i++){
-        const amount=i===chunks-1?remaining:Math.round((total/chunks)*100)/100;
-        amounts.push(Math.min(amount,remaining));
-        remaining=Math.round((remaining-amounts[i])*100)/100;
-      }
+      const totalMinutes=Math.max(
+        1,
+        Math.round(itemDurationMinutes(task,task.amount))
+      );
+
+      const availableDayCount=Math.max(1,last-first+1);
+      const focusMinimum=minimumFocusChunkMinutes(task);
+      const maxConfiguredBlock=Math.max(
+        1,
+        ...BLOCKS.map(block=>{
+          const start=timeToMinutes(settings.blockTimes[block].start);
+          const end=timeToMinutes(settings.blockTimes[block].end);
+          return Math.min(MAX_BLOCK_MINUTES,Math.max(0,end-start));
+        })
+      );
+
+      const minimumChunksForCapacity=Math.ceil(totalMinutes/maxConfiguredBlock);
+      const preferredSessionChunks=task.allAtOnce
+        ? 1
+        : Math.ceil(totalMinutes/focusMinimum);
+
+      let chunkCount=task.allAtOnce
+        ? minimumChunksForCapacity
+        : Math.max(
+            minimumChunksForCapacity,
+            Math.min(availableDayCount,preferredSessionChunks)
+          );
+
+      chunkCount=Math.max(1,chunkCount);
+
+      const baseMinutes=Math.floor(totalMinutes/chunkCount);
+      let remainder=totalMinutes-baseMinutes*chunkCount;
+      const chunkMinutes=Array.from({length:chunkCount},()=>{
+        const value=baseMinutes+(remainder>0?1:0);
+        if(remainder>0)remainder-=1;
+        return value;
+      }).filter(value=>value>0);
 
       const dayIndices=[];
-      for(let i=first;i<=last;i++)dayIndices.push(i);
+      for(let dayIndex=first;dayIndex<=last;dayIndex++)dayIndices.push(dayIndex);
 
-      amounts.forEach((amount,i)=>{
-        const slot=chooseSlot(dayIndices,task,dueDate,null,amount);
+      let scheduledMinutes=0;
+
+      chunkMinutes.forEach((minutes,index)=>{
+        const targetDayIndex=chunkMinutes.length===1
+          ? last
+          : Math.round(
+              first+
+              index*(last-first)/(chunkMinutes.length-1)
+            );
+
+        const amount=taskAmountFromMinutes(task,minutes);
+        const slot=chooseSlot(
+          dayIndices,
+          task,
+          dueDate,
+          null,
+          amount,
+          null,
+          targetDayIndex
+        );
+
         if(!slot)return;
-        const label=task.allAtOnce?"Single block":chunks===1?"Task block":`Part ${i+1} of ${chunks}`;
-        addScheduledItem(slot,task,amount,label,instanceId,dueDate);
+
+        const label=task.allAtOnce&&chunkMinutes.length===1
+          ? "Single block"
+          : chunkMinutes.length===1
+            ? "Task block"
+            : `Part ${index+1} of ${chunkMinutes.length}`;
+
+        if(addScheduledItem(slot,task,amount,label,instanceId,dueDate)){
+          scheduledMinutes+=minutes;
+        }
       });
+
+      if(scheduledMinutes<totalMinutes){
+        unscheduledWork.push({
+          taskId:task.id,
+          taskName:task.name,
+          minutes:totalMinutes-scheduledMinutes,
+          dueDate
+        });
+      }
     }
 
     function recurringDueDates(task,horizonEnd){
@@ -1957,29 +2114,73 @@
     function buildMasterPlan(){
       const horizonDays=Math.max(90,(weekOffset+2)*7);
       const start=todayStart();
-      masterPlan=Array.from({length:horizonDays},(_,i)=>createDay(addDays(start,i),i));
-      const horizonEnd=masterPlan[masterPlan.length-1].date;
+      masterPlan=Array.from(
+        {length:horizonDays},
+        (_,index)=>createDay(addDays(start,index),index)
+      );
+      unscheduledWork=[];
 
+      const horizonEnd=masterPlan[masterPlan.length-1].date;
       const active=tasks.filter(task=>!task.completed);
+      const instances=[];
 
       active.filter(task=>task.recurring).forEach(task=>{
-        const dueDates=recurringDueDates(task,horizonEnd);
-        dueDates.forEach((due,index)=>{
-          const windowDays=task.frequency==="daily"?0:task.frequency==="weekly"?6:27;
-          const windowStart=new Date(Math.max(start.getTime(),addDays(due,-windowDays).getTime()));
-          scheduleInstance(task,windowStart,due,`${task.id}-rec-${dateKey(due)}-${index}`);
+        recurringDueDates(task,horizonEnd).forEach((due,index)=>{
+          const windowDays=task.frequency==="daily"
+            ? 0
+            : task.frequency==="weekly"
+              ? 6
+              : 27;
+
+          instances.push({
+            task,
+            dueDate:due,
+            windowStart:new Date(
+              Math.max(start.getTime(),addDays(due,-windowDays).getTime())
+            ),
+            instanceId:`${task.id}-rec-${dateKey(due)}-${index}`,
+            flexible:false
+          });
         });
       });
 
       active.filter(task=>!task.recurring&&task.deadline).forEach(task=>{
         let due=parseDate(task.deadline);
         if(due<start)due=start;
-        scheduleInstance(task,start,due,`${task.id}-once`);
+        instances.push({
+          task,
+          dueDate:due,
+          windowStart:start,
+          instanceId:`${task.id}-once`,
+          flexible:false
+        });
       });
 
       active.filter(task=>!task.recurring&&!task.deadline).forEach(task=>{
-        const due=addDays(start,13);
-        scheduleInstance(task,start,due,`${task.id}-flex`);
+        instances.push({
+          task,
+          dueDate:addDays(start,13),
+          windowStart:start,
+          instanceId:`${task.id}-flex`,
+          flexible:true
+        });
+      });
+
+      // Earlier deadlines receive capacity first. Flexible work is always last.
+      instances.sort((a,b)=>{
+        if(a.flexible!==b.flexible)return a.flexible?1:-1;
+        const dueDifference=a.dueDate-b.dueDate;
+        if(dueDifference!==0)return dueDifference;
+        return Number(b.task.motivation||2)-Number(a.task.motivation||2);
+      });
+
+      instances.forEach(instance=>{
+        scheduleInstance(
+          instance.task,
+          instance.windowStart,
+          instance.dueDate,
+          instance.instanceId
+        );
       });
 
       applyManualMoves();
@@ -2153,16 +2354,34 @@
           <div class="plan-item-title">${escapeHtml(item.task.name)}</div>
           ${item.task.categoryId?categoryChipHtml(item.task.categoryId,"plan-category"):""}
           <div class="plan-item-row">
-            <div class="plan-item-meta">${formatAmount(item.amount)} ${escapeHtml(item.task.unit)} · ${escapeHtml(item.label)}</div>
+            <div class="plan-item-meta">${formatTaskDuration(item.task,item.amount)} · ${escapeHtml(item.label)}</div>
             <div class="plan-item-actions">
-              <button class="complete-block-btn ${done?"undo":""}" onclick="togglePlanItemDone('${item.progressKey}')">${done?"Undo":"Mark done"}</button>
-              <button class="start-timer-btn" onclick="startTaskTimer('${item.id}')">Start timer</button>
+              <button
+                class="plan-icon-btn complete ${done?"done":""}"
+                onclick="togglePlanItemDone('${item.progressKey}')"
+                title="${done?"Undo completion":"Mark done"}"
+                aria-label="${done?"Undo completion":"Mark done"}"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M5 12.5 9.2 17 19 7"></path>
+                </svg>
+              </button>
+              <button
+                class="plan-icon-btn timer"
+                onclick="startTaskTimer('${item.id}')"
+                title="Start timer"
+                aria-label="Start timer"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <circle cx="12" cy="13" r="8"></circle>
+                  <path d="M12 9v4l2.5 1.5M9 2h6M12 2v3"></path>
+                </svg>
+              </button>
             </div>
           </div>
           <div class="time-progress">
             <div class="time-progress-copy"><span>Task time: ${targetText}</span><strong class="${taskTimed.overMinutes?"time-overage":""}">${shownPercent}%</strong></div>
             <div class="time-progress-track"><div class="time-progress-fill ${taskTimed.overMinutes?"over":""}" style="width:${shownPercent}%"></div></div>
-            <div class="drag-hint">Drag to move · This block: ${formatDurationMinutes(blockTimed.loggedMinutes)} of ${formatDurationMinutes(blockTimed.targetMinutes)}</div>
           </div>
         </div>`;
     }
@@ -2176,13 +2395,16 @@
       $("weekRange").innerHTML=`${formatDate(start,{month:"short",day:"numeric"})} – ${formatDate(end,{month:"short",day:"numeric",year:"numeric"})}<small>${weekOffset===0?"Current seven-day plan":`Following week ${weekOffset}`}</small>`;
       $("prevWeekBtn").disabled=weekOffset===0;
 
-      $("planSubtitle").textContent=settings.divideBlocks
-        ? `Tasks use remaining time inside each block. A block that has started can still accept work that fits before it ends.`
-        : "Tasks are balanced across the next seven days using the time still available today.";
+      const warningMinutes=unscheduledWork.reduce(
+        (sum,item)=>sum+Number(item.minutes||0),
+        0
+      );
 
-      $("footerNote").textContent=settings.divideBlocks
-        ? "Drag a task card to another day or time block. Morning, afternoon, and evening times can be changed in Settings."
-        : "Drag a task card to another day. Use Redistribute when a day cannot be completed.";
+      $("planSubtitle").textContent=warningMinutes
+        ? `Earlier deadlines are scheduled first. ${formatDurationMinutes(warningMinutes)} could not fit before its deadline within the 12-hour daily and 4-hour block limits.`
+        : "Work is spread evenly to each deadline. Earlier deadlines take priority. Maximum: 12 hours per day and 4 hours per time block.";
+
+      $("footerNote").textContent="";
 
       els.scheduleGrid.innerHTML=days.map(day=>{
         const globalIndex=day.index;
@@ -2202,7 +2424,7 @@
             const statusClass=state==="ended"?"closed":"";
             return `
               <div class="block-bin">
-                <div class="block-head">
+                <div class="block-head block-head-${block}">
                   <div>
                     <span class="block-title">${BLOCK_LABELS[block]}</span>
                     ${state==="ended"?`<span class="block-status ${statusClass}">Ended</span>`:""}
@@ -2422,7 +2644,7 @@
         completedPlanKeys.add(timer.item.progressKey);
       }
       persist();
-      renderPlan();renderStats();renderTasks();
+      renderPlan();renderStats();renderTasks();renderProgress();
     }
 
     function startTaskTimer(itemId){
@@ -2595,7 +2817,7 @@
             ${task.notes?`<div class="task-note">${escapeHtml(task.notes)}</div>`:""}
             <div class="chips">
               ${task.categoryId?categoryChipHtml(task.categoryId):""}
-              <span class="chip">${formatAmount(task.amount)} ${escapeHtml(task.unit)}</span>
+              <span class="chip">${formatTaskDuration(task)}</span>
               <span class="chip">${difficultyText(task)}</span>
               <span class="chip">${task.deadline?`Due ${formatDate(parseDate(task.deadline),{month:"short",day:"numeric"})}`:"No deadline"}</span>
               ${task.deadlineBlock?`<span class="chip">${BLOCK_LABELS[task.deadlineBlock]} deadline</span>`:""}
@@ -2889,6 +3111,7 @@
     }
     function bootApp(){
       hideFatalError();
+      if(normalizeLegacyTimeTasks())persistLocal(true);
       renderSettings();
       renderLiveTime();
       renderAll();
@@ -2961,7 +3184,14 @@
     $("nextWeekBtn").addEventListener("click",()=>{
       weekOffset+=1;buildMasterPlan();renderStats();renderTasks();
     });
-    $("rebalanceBtn").addEventListener("click",()=>{buildMasterPlan();renderStats();renderTasks();showToast("Plan rebalanced")});
+    $("rebalanceBtn").addEventListener("click",()=>{
+      manualMoves={};
+      persist();
+      buildMasterPlan();
+      renderStats();
+      renderTasks();
+      showToast("Plan rebalanced by deadline");
+    });
 
     $("timerStartPauseBtn").addEventListener("click",()=>{
       if(!activeTimer)return;
