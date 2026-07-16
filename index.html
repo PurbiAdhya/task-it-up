@@ -4,6 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Task-it-up</title>
+  <meta name="theme-color" content="#6A9CF5" />
+  <link rel="icon" type="image/png" sizes="64x64" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAABYUlEQVR42u2buRKCQAxA2YwVfiZW+j1Y6Wdqq5UzFrDskXuTXsx7OTgGpikiIiJi4EgYB7k+Xh8pgPvlnEQESEJjykgewHtEgDf42jzBG3xtvuARviZv8Apfmj94hi/hgGnwAO/VP+KJDggBA7R/jis6wFrC6zKPK+AHjykBrFZ+XWYUEeZ3QK8EsA55e759C6CEVy8Ae+O72gEY1VctgLr1VQvgglcpgGPu1Qo4gseuvqklSAFPJqCljTnnnlRAyw2LFDy6gK0bFm1Lj0zAHkgOUGLpkQnIJdtSZQ549BGoSVpy7kmX4F7y/8Ba4MlOgzkJ0kuP7UKopZLc1Vd1JSgBTy6gFEoKnqUDJOHUjEBOgrQgkJxxDd1xGmHRuXgewCqg9/VTrbHFFR0QAiraxVv7RwccCfDSBTkO6PmxdfjiEbAqoSRvwDyYNfjqJWhFQk2e8c0Qxh9b/mosIiJi7PgCUhSjcgEsTJsAAAAASUVORK5CYII=" />
+  <link rel="shortcut icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAABYUlEQVR42u2buRKCQAxA2YwVfiZW+j1Y6Wdqq5UzFrDskXuTXsx7OTgGpikiIiJi4EgYB7k+Xh8pgPvlnEQESEJjykgewHtEgDf42jzBG3xtvuARviZv8Apfmj94hi/hgGnwAO/VP+KJDggBA7R/jis6wFrC6zKPK+AHjykBrFZ+XWYUEeZ3QK8EsA55e759C6CEVy8Ae+O72gEY1VctgLr1VQvgglcpgGPu1Qo4gseuvqklSAFPJqCljTnnnlRAyw2LFDy6gK0bFm1Lj0zAHkgOUGLpkQnIJdtSZQ549BGoSVpy7kmX4F7y/8Ba4MlOgzkJ0kuP7UKopZLc1Vd1JSgBTy6gFEoKnqUDJOHUjEBOgrQgkJxxDd1xGmHRuXgewCqg9/VTrbHFFR0QAiraxVv7RwccCfDSBTkO6PmxdfjiEbAqoSRvwDyYNfjqJWhFQk2e8c0Qxh9b/mosIiJi7PgCUhSjcgEsTJsAAAAASUVORK5CYII=" />
+  <link rel="apple-touch-icon" sizes="180x180" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAALQAAAC0CAYAAAA9zQYyAAADSUlEQVR42u3dS04jMRiFUcpiRJZJRmE9ZBSWGaZhAwSRh11/XZ9vAS1InbptR2r1y4skSZIkSZIkSZIkSZIkSfq7JeUXOZzOF4/zsY773QI0vJADDTHck4IGGewI0CCDHQEaZLAjQIMM9jNqMCvpOS4gK2mtG8xKer4NZiU95wazkp53g1lJz73BrKTn32BWEuoGs5JQN5iVhLrBrCTUzUerpNqW3j5Z6eGgYdaaXhw55MhhnVXVjYWWhbbOqrrSFloW2jqr6kpbaFlo66yqK22hZaGlSNCOG6p27LDQstAS0BLQ0iDQLoSqeDG00LLQEtAq0ef7G9DKwpyMGuhJlzkVNdCTI0+DDbRzcxRqoF0Co1ADDXMUaqBhjjpXAw1z1FoDrSjUQEN4tY+vb6AFM9Ca9swLtLpj3uo6Aw1zFGagFYUZaOschRlomKMwAw1zXEC7BAItmIFWqRIxA+0SCLRgBlplzs3pAe0SCLRcAoGWczPQMMMMNMyTYgY6/BI4Y0CHYp5xnYEObVbMQDs3Ay2YgZZLINDZgFwCgX4KoAqoYQb6qYCS/qqHeTLQ1/CuhdolEOhueEajhhno7nhGofaNBtDD8PTG5hII9HA8W1lQmCcC/SjKHqidm4FeFc4zAcIMdIllrfa/SME8EeheZ99H/lzfaABdcr3ugekbDaA9dJiBHvXwb1lc52agY1DDDHQMapdAoGNQuwQCHYMaZqCnuyjCDPR0qGEGOgYMzECDI6ArovaSAR2DCGagvVQCuhoomIGOgQUz0IAJ6IqovTxAx6CGGegY1DADHYMaZqBjUMMM9HQXRQG9CdReCKBjUMMMdAxqmNfv1UdwG9Tf/qUKyEC7MMqRQwJaQP+n4363+PjUq3t9WWhZaAloCWhpIGgXQ1W6EFpoWWgpGrRjh6ocNyy0LLSVVtV1ttCy0FZaVdfZQstCW2lVXWcLLQttpVXZS9vCDymYHTnkyGGlteV17r7QUGu0i7blH14wr3KGhlqjHLSkX0ZzYx4KGmqY40BDDXMcaKhhjgMNNcy9KoHqcDpfEAB50wttrWGOXWhrDXIsaLBBjgQNNsiRoMEGORI03BDHgoYcXkmSJEmSJEmSJEmSJEka2g9YnMhH2VBBYAAAAABJRU5ErkJggg==" />
   <style>
     :root{
       --bg:#f5f8ff;
@@ -2285,7 +2289,7 @@
       return dates;
     }
 
-    function buildMasterPlan({rebalance=false}={}){
+    function buildMasterPlan({rebalance=false,saveLayout=false}={}){
       const horizonDays=Math.max(90,(weekOffset+2)*7);
       const start=todayStart();
       masterPlan=Array.from(
@@ -2359,8 +2363,11 @@
 
       if(rebalance){
         rebalanceScheduledItems();
+        rescheduleUnfinishedElapsedWork();
+        if(saveLayout)saveCurrentPlanLayout();
       }else{
         applyManualMoves();
+        rescheduleUnfinishedElapsedWork();
       }
       renderPlan();
     }
@@ -2397,6 +2404,22 @@
       }
 
       return score;
+    }
+
+    function saveCurrentPlanLayout(){
+      const savedMoves={};
+
+      masterPlan.forEach(day=>{
+        day.items.forEach(item=>{
+          savedMoves[item.progressKey]={
+            date:dateKey(day.date),
+            block:settings.divideBlocks?item.block:"day"
+          };
+        });
+      });
+
+      manualMoves=savedMoves;
+      persist();
     }
 
     function rebalanceScheduledItems(){
@@ -2498,6 +2521,9 @@
       if(completedPlanKeys.has(progressKey))completedPlanKeys.delete(progressKey);
       else completedPlanKeys.add(progressKey);
       persist();
+      if(!completedPlanKeys.has(progressKey)){
+        rescheduleUnfinishedElapsedWork();
+      }
       renderPlan();renderStats();renderTasks();renderProgress();renderTimer();
       showToast(completedPlanKeys.has(progressKey)?"Work block marked done":"Work block reopened");
     }
@@ -2901,6 +2927,135 @@
         const block=settings.divideBlocks?(BLOCKS.includes(target.block)?target.block:"morning"):"day";
         movePlanItem(progressKey,index,block,{remember:false,render:false,notify:false});
       });
+    }
+
+    function savedPlacementHasElapsed(target){
+      if(!target||!target.date)return false;
+
+      const today=dateKey(todayStart());
+      if(target.date<today)return true;
+      if(target.date>today)return false;
+
+      if(!settings.divideBlocks){
+        return BLOCKS.every(block=>blockTimeState(0,block)==="ended");
+      }
+
+      return (
+        !BLOCKS.includes(target.block)||
+        blockTimeState(0,target.block)==="ended"||
+        isBlockUnavailable(0,target.block)
+      );
+    }
+
+    function itemPlacementHasElapsed(day,item){
+      if(!day||day.index!==0)return false;
+
+      if(!settings.divideBlocks){
+        return BLOCKS.every(block=>blockTimeState(0,block)==="ended");
+      }
+
+      return (
+        blockTimeState(0,item.block)==="ended"||
+        isBlockUnavailable(0,item.block)
+      );
+    }
+
+    function placeExistingItem(item,slot){
+      item.block=slot.block;
+      const target=masterPlan[slot.dayIndex];
+      target.items.push(item);
+      target.load+=item.weight;
+      if(settings.divideBlocks){
+        target.blocks[slot.block].push(item);
+      }
+      manualMoves[item.progressKey]={
+        date:dateKey(target.date),
+        block:settings.divideBlocks?slot.block:"day"
+      };
+    }
+
+    function rescheduleUnfinishedElapsedWork(){
+      const progressKeys=new Set();
+
+      masterPlan.forEach(day=>{
+        day.items.forEach(item=>{
+          if(
+            !isItemDone(item)&&
+            itemPlacementHasElapsed(day,item)
+          ){
+            progressKeys.add(item.progressKey);
+          }
+        });
+      });
+
+      Object.entries(manualMoves).forEach(([progressKey,target])=>{
+        if(savedPlacementHasElapsed(target)){
+          const located=findPlanItem(progressKey);
+          if(located&&!isItemDone(located.item)){
+            progressKeys.add(progressKey);
+          }
+        }
+      });
+
+      if(!progressKeys.size)return false;
+
+      let changed=false;
+
+      [...progressKeys].forEach(progressKey=>{
+        const located=findPlanItem(progressKey);
+        if(!located||isItemDone(located.item))return;
+
+        const {day:source,item}=located;
+        const deadline=
+          item.dueDate||
+          parseDate(item.task.deadline)||
+          masterPlan[masterPlan.length-1].date;
+
+        const lastIndex=clamp(
+          Math.floor((deadline-todayStart())/86400000),
+          0,
+          masterPlan.length-1
+        );
+
+        removeItemFromDay(source,item);
+
+        const dayIndices=[];
+        for(let dayIndex=0;dayIndex<=lastIndex;dayIndex++){
+          dayIndices.push(dayIndex);
+        }
+
+        const slot=chooseSlot(
+          dayIndices,
+          item.task,
+          deadline,
+          null,
+          item.amount,
+          null,
+          0
+        );
+
+        if(slot){
+          placeExistingItem(item,slot);
+          changed=true;
+          return;
+        }
+
+        // Do not place unfinished work after its deadline.
+        unscheduledWork.push({
+          taskId:item.task.id,
+          taskName:item.task.name,
+          minutes:itemDurationMinutes(item.task,item.amount),
+          dueDate:deadline
+        });
+        delete manualMoves[item.progressKey];
+        changed=true;
+      });
+
+      if(changed){
+        persist();
+      }
+
+      return changed;
     }
     function closeMoveTask(){
       activeMoveProgressKey=null;
@@ -3695,14 +3850,13 @@
     });
     $("rebalanceBtn").addEventListener("click",()=>{
       manualMoves={};
-      persist();
-      buildMasterPlan({rebalance:true});
+      buildMasterPlan({rebalance:true,saveLayout:true});
       renderStats();
       renderTasks();
       showToast(
         settings.divideBlocks
-          ?"Balanced across available time blocks"
-          :"Balanced across available days"
+          ?"Balanced layout saved across time blocks"
+          :"Balanced layout saved across days"
       );
     });
 
