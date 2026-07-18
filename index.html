@@ -650,6 +650,32 @@
     }
   </style>
 
+
+  <style id="unavailable-block-controls">
+    .block-toggle{
+      width:100%;border:0;text-align:left;color:inherit;cursor:pointer;
+      transition:background .16s ease,opacity .16s ease
+    }
+    .block-toggle:not(:disabled):hover{filter:brightness(.985)}
+    .block-toggle:disabled{cursor:default}
+    .block-head .availability-copy{font-size:.62rem;font-weight:550;color:var(--primary)}
+    .block-head .availability-copy.is-unavailable{color:#8e6f78}
+    .block.unavailable{background:rgba(247,235,229,.44)}
+    .block.unavailable .block-body{background:rgba(255,255,255,.25)}
+    .modal-helper{margin:-8px 0 22px;color:var(--muted);font-size:.82rem;line-height:1.5}
+    .availability-mode{margin:0 0 18px}
+    .availability-mode .choice{text-align:center}
+    .unavailable-modal-section{margin-top:26px;padding-top:22px;border-top:1px solid var(--line)}
+    .unavailable-modal-section h3{margin:0 0 5px;font-size:1rem;font-weight:550;color:#3d464d}
+    .unavailable-modal-section p{margin:0 0 12px;color:var(--muted);font-size:.74rem;line-height:1.45}
+    #planUnavailableList:empty::after{content:"No unavailable blocks yet.";display:block;color:var(--muted);font-size:.76rem;padding:10px 0}
+    @media(max-width:720px){
+      .toolbar-actions{gap:6px}
+      .toolbar-actions .btn{padding-inline:12px;font-size:.75rem}
+      .block-head .availability-copy{font-size:.66rem}
+    }
+  </style>
+
 </head>
 <body>
   <div class="app">
@@ -730,6 +756,7 @@
             <div><h2>Your plan</h2><p id="planSubtitle">Work is divided into manageable focus blocks.</p></div>
             <div class="toolbar-actions">
               <button class="btn btn-soft" id="balanceWeekButton" type="button">Balance week</button>
+              <button class="btn btn-ghost" id="planUnavailableButton" type="button">＋ Unavailable</button>
               <button class="btn btn-primary" id="planAddTaskButton" type="button">＋ Add task</button>
             </div>
           </div>
@@ -848,6 +875,30 @@
     </div>
   </div>
 
+
+  <div class="backdrop hidden" id="unavailableBackdrop"></div>
+  <div class="modal hidden" id="unavailableModal" role="dialog" aria-modal="true" aria-labelledby="unavailableTitle">
+    <div class="modal-head"><h2 id="unavailableTitle">Add unavailable time</h2><button class="modal-close" id="closeUnavailableModal" type="button" aria-label="Close">×</button></div>
+    <div class="modal-body">
+      <p class="modal-helper">Add a weekly unavailable block here. For a single day, you can also click that block’s header in the plan.</p>
+      <div class="choice-grid availability-mode" id="unavailableModeChoices">
+        <button class="choice selected" type="button" data-unavailable-mode="weekly">Every week</button>
+        <button class="choice" type="button" data-unavailable-mode="once">One time</button>
+      </div>
+      <div class="form-row">
+        <div class="field" id="planUnavailableWeekdayField"><label for="planUnavailableWeekday">Day</label><select id="planUnavailableWeekday"><option value="0">Sunday</option><option value="1">Monday</option><option value="2">Tuesday</option><option value="3">Wednesday</option><option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option></select></div>
+        <div class="field hidden" id="planUnavailableDateField"><label for="planUnavailableDate">Date</label><input id="planUnavailableDate" type="date" /></div>
+        <div class="field"><label for="planUnavailableBlock">Time</label><select id="planUnavailableBlock"><option value="morning">Morning</option><option value="afternoon">Afternoon</option><option value="evening">Evening</option></select></div>
+      </div>
+      <button class="btn btn-primary" style="width:100%" id="confirmUnavailableButton" type="button">Add weekly unavailable block</button>
+      <div class="unavailable-modal-section">
+        <h3>Unavailable blocks</h3>
+        <p>Remove a block here whenever your availability changes.</p>
+        <div class="unavailable-list" id="planUnavailableList"></div>
+      </div>
+    </div>
+  </div>
+
   <div class="focus-overlay hidden" id="focusOverlay">
     <button class="focus-close" id="closeFocusButton" type="button" aria-label="Close focus mode">×</button>
     <div class="focus-card">
@@ -921,7 +972,7 @@
       tasks:[],settings:structuredCloneSafe(defaultSettings),completedSessions:new Set(),manualMoves:{},
       masterPlan:[],unscheduled:[],instanceKeys:new Map(),taskProgress:new Map(),weekOffset:0,taskFilter:"active",
       wizardStep:1,wizardDeadlineChoice:"none",wizardEstimate:30,wizardFeeling:"neutral",wizardSplit:"split",
-      activeMoveKey:null,activeTimer:null,timerTicker:null,audioContext:null,
+      activeMoveKey:null,unavailableMode:"weekly",activeTimer:null,timerTicker:null,audioContext:null,
       firebaseAuth:null,firebaseDb:null,firebaseUser:null,firebaseFunctions:null,cloudUnsubscribe:null,cloudSaveTimer:null,
       applyingCloudState:false,localRevisionAt:0,firebaseInitialized:false
     };
@@ -1032,9 +1083,10 @@
     function difficultBlockLoad(day,block){return (day?.blocks?.[block]||[]).reduce((sum,item)=>sum+(!isSessionDone(item.key)&&item.task.feeling==="difficult"?item.minutes:0),0)}
     function difficultBlockCount(day,block){return (day?.blocks?.[block]||[]).filter(item=>!isSessionDone(item.key)&&item.task.feeling==="difficult").length}
     function availableCapacity(day,block){return Math.max(0,usableBlockCapacity(day,block)-blockLoad(day,block))}
-    function isUnavailable(date,block){
-      return state.settings.unavailableBlocks.some(rule=>rule.block===block&&(rule.recurring?Number(rule.weekday)===date.getDay():rule.date===dateKey(date)));
+    function unavailableRulesFor(date,block){
+      return state.settings.unavailableBlocks.filter(rule=>rule.block===block&&(rule.recurring?Number(rule.weekday)===date.getDay():rule.date===dateKey(date)));
     }
+    function isUnavailable(date,block){return unavailableRulesFor(date,block).length>0}
     function isSessionDone(key){return state.completedSessions.has(key)}
 
     function createDay(date,index){return {date,index,items:[],blocks:{morning:[],afternoon:[],evening:[]},load:0}}
@@ -1307,8 +1359,10 @@
       $("weekGrid").innerHTML=days.map(day=>{
         const open=day.items.filter(item=>!isSessionDone(item.key));const done=day.items.filter(item=>isSessionDone(item.key));const total=open.reduce((sum,item)=>sum+item.minutes,0);const capacity=BLOCKS.reduce((sum,block)=>sum+(isUnavailable(day.date,block)?0:blockCapacity(block)),0);const percent=Math.min(100,Math.round(total/Math.max(1,capacity)*100));
         const blocks=BLOCKS.map(block=>{
-          const items=day.blocks[block];const unavailable=isUnavailable(day.date,block);const stateCopy=day.index===0&&blockState(0,block)==="ended"?"Ended":unavailable?"Unavailable":"";
-          return `<div class="block"><div class="block-head ${block}"><div>${BLOCK_LABELS[block]}</div><span>${stateCopy}</span></div><div class="block-body">${items.length?items.map(planItemHtml).join(""):`<div class="empty-block">${unavailable?"Unavailable":"Open"}</div>`}</div></div>`;
+          const items=day.blocks[block];const rules=unavailableRulesFor(day.date,block);const unavailable=rules.length>0;const recurring=rules.some(rule=>rule.recurring);const ended=day.index===0&&blockState(0,block)==="ended";
+          const stateCopy=ended?"Ended":unavailable?(recurring?"Weekly unavailable":"Unavailable"):"＋ Unavailable";
+          const ariaCopy=ended?`${BLOCK_LABELS[block]} has ended`:unavailable?`Make ${BLOCK_LABELS[block].toLowerCase()} available`:`Mark ${BLOCK_LABELS[block].toLowerCase()} unavailable`;
+          return `<div class="block ${unavailable?"unavailable":""}"><button class="block-head block-toggle ${block}" type="button" data-action="toggle-unavailable" data-date="${dateKey(day.date)}" data-block="${block}" aria-label="${ariaCopy}" title="${ariaCopy}" ${ended?"disabled":""}><div>${BLOCK_LABELS[block]}</div><span class="availability-copy ${unavailable?"is-unavailable":""}">${stateCopy}</span></button><div class="block-body">${items.length?items.map(planItemHtml).join(""):`<div class="empty-block">${unavailable?"Unavailable":"Open"}</div>`}</div></div>`;
         }).join("");
         return `<article class="day-card ${day.index===0?"today":""}"><div class="day-head"><strong>${day.index===0?"Today":formatDate(day.date,{weekday:"short"})}</strong><span>${formatDate(day.date,{month:"short",day:"numeric"})}</span><div class="day-load"><span>${formatMinutes(total)} remaining</span><span>${done.length}/${day.items.length} done</span></div><div class="load-track"><div class="load-fill" style="width:${percent}%"></div></div></div><div class="day-body">${blocks}</div></article>`;
       }).join("");
@@ -1324,10 +1378,17 @@
       }).join("");
     }
 
+    function unavailableListHtml(emptyCopy=""){
+      const rules=[...state.settings.unavailableBlocks].sort((a,b)=>Number(b.recurring)-Number(a.recurring)||(Number(a.weekday??7)-Number(b.weekday??7))||String(a.date||"").localeCompare(String(b.date||""))||BLOCKS.indexOf(a.block)-BLOCKS.indexOf(b.block));
+      if(!rules.length)return emptyCopy?`<div class="empty-block">${emptyCopy}</div>`:"";
+      return rules.map(rule=>`<div class="unavailable-row"><div><strong>${rule.recurring?`${formatWeekday(rule.weekday)}s`:formatDate(parseDate(rule.date),{month:"short",day:"numeric",year:"numeric"})} · ${BLOCK_LABELS[rule.block]}</strong><span>${rule.recurring?"Repeats weekly":"One time"}</span></div><button class="round-action" data-action="delete-unavailable" data-id="${rule.id}" title="Remove unavailable block" aria-label="Remove unavailable block">×</button></div>`).join("");
+    }
+
     function renderSettings(){
       for(const block of BLOCKS){$(block+"Start").value=state.settings.blockTimes[block].start;$(block+"End").value=state.settings.blockTimes[block].end}
-      $("highEnergyBlock").value=state.settings.highEnergyBlock;$("timerSound").value=state.settings.timerSound||"gentle";$("unavailableDate").value=dateKey(new Date());
-      $("unavailableList").innerHTML=state.settings.unavailableBlocks.length?state.settings.unavailableBlocks.map(rule=>`<div class="unavailable-row"><div><strong>${rule.recurring?formatWeekday(rule.weekday):formatDate(parseDate(rule.date),{month:"short",day:"numeric",year:"numeric"})} · ${BLOCK_LABELS[rule.block]}</strong><span>${rule.recurring?"Repeats weekly":"One time"}</span></div><button class="round-action" data-action="delete-unavailable" data-id="${rule.id}">×</button></div>`).join(""):"";
+      $("highEnergyBlock").value=state.settings.highEnergyBlock;$("timerSound").value=state.settings.timerSound||"gentle";if(!$("unavailableDate").value)$("unavailableDate").value=dateKey(new Date());
+      $("unavailableList").innerHTML=unavailableListHtml();
+      $("planUnavailableList").innerHTML=unavailableListHtml("No unavailable blocks yet.");
     }
 
     function renderAll(){buildPlan();renderHeader();renderToday();renderPlan();renderTasks();renderSettings();renderTimer()}
@@ -1423,15 +1484,62 @@
     function ensureAudio(){if(!state.audioContext)state.audioContext=new (window.AudioContext||window.webkitAudioContext)();return state.audioContext}
     function playTimerSound(){if(state.settings.timerSound==="none")return;try{const ctx=ensureAudio();const gain=ctx.createGain(),osc=ctx.createOscillator();osc.connect(gain);gain.connect(ctx.destination);osc.frequency.value=state.settings.timerSound==="bell"?720:520;gain.gain.setValueAtTime(.0001,ctx.currentTime);gain.gain.exponentialRampToValueAtTime(.18,ctx.currentTime+.02);gain.gain.exponentialRampToValueAtTime(.0001,ctx.currentTime+.75);osc.start();osc.stop(ctx.currentTime+.8)}catch(error){console.warn(error)}}
 
+    function setUnavailableMode(mode){
+      state.unavailableMode=mode==="once"?"once":"weekly";
+      selectButtons("unavailableModeChoices","data-unavailable-mode",state.unavailableMode);
+      $("planUnavailableWeekdayField").classList.toggle("hidden",state.unavailableMode!=="weekly");
+      $("planUnavailableDateField").classList.toggle("hidden",state.unavailableMode!=="once");
+      $("confirmUnavailableButton").textContent=state.unavailableMode==="weekly"?"Add weekly unavailable block":"Add unavailable block";
+    }
+    function openUnavailableModal(options={}){
+      const selectedDate=options.date?parseDate(options.date):new Date();
+      $("planUnavailableDate").value=options.date||dateKey(new Date());
+      $("planUnavailableWeekday").value=String(Number.isInteger(options.weekday)?options.weekday:selectedDate.getDay());
+      $("planUnavailableBlock").value=BLOCKS.includes(options.block)?options.block:"morning";
+      setUnavailableMode(options.mode||"weekly");
+      $("unavailableBackdrop").classList.remove("hidden");$("unavailableModal").classList.remove("hidden");document.body.style.overflow="hidden";
+    }
+    function closeUnavailableModal(){$("unavailableBackdrop").classList.add("hidden");$("unavailableModal").classList.add("hidden");document.body.style.overflow=""}
+    function unavailableRuleExists({date="",block,recurring=false,weekday=null}){
+      return state.settings.unavailableBlocks.some(rule=>rule.block===block&&Boolean(rule.recurring)===Boolean(recurring)&&(recurring?Number(rule.weekday)===Number(weekday):rule.date===date));
+    }
+    function addUnavailableFromPlan(){
+      const block=$("planUnavailableBlock").value;
+      if(state.unavailableMode==="weekly"){
+        const weekday=Number($("planUnavailableWeekday").value);
+        if(unavailableRuleExists({block,recurring:true,weekday})){showToast(`${formatWeekday(weekday)} ${BLOCK_LABELS[block].toLowerCase()} is already unavailable every week`);return}
+        state.settings.unavailableBlocks.push({id:uid(),date:"",block,recurring:true,weekday});
+        persist();renderAll();showToast(`Blocked every ${formatWeekday(weekday)} ${BLOCK_LABELS[block].toLowerCase()}`);return;
+      }
+      const date=$("planUnavailableDate").value;if(!date){showToast("Choose a date");return}
+      const parsed=parseDate(date);if(parsed<dateStart()){showToast("Choose today or a later date");return}
+      if(unavailableRuleExists({date,block,recurring:false})){showToast("That block is already unavailable");return}
+      state.settings.unavailableBlocks.push({id:uid(),date,block,recurring:false,weekday:parsed.getDay()});
+      persist();renderAll();showToast(`Blocked ${formatDate(parsed,{weekday:"short",month:"short",day:"numeric"})} ${BLOCK_LABELS[block].toLowerCase()}`);
+    }
+    function toggleBlockUnavailable(dateValue,block){
+      const date=parseDate(dateValue);if(!date||!BLOCKS.includes(block))return;
+      if(date<dateStart()){showToast("Past blocks cannot be changed");return}
+      const rules=unavailableRulesFor(date,block);
+      if(rules.length){
+        const recurring=rules.filter(rule=>rule.recurring);
+        if(recurring.length&&!confirm(`Remove the weekly unavailable block for every ${formatWeekday(date.getDay())} ${BLOCK_LABELS[block].toLowerCase()}?`))return;
+        const ids=new Set(rules.map(rule=>rule.id));state.settings.unavailableBlocks=state.settings.unavailableBlocks.filter(rule=>!ids.has(rule.id));
+        persist();renderAll();showToast(recurring.length?"Weekly unavailable block removed":"Block is available again");return;
+      }
+      state.settings.unavailableBlocks.push({id:uid(),date:dateValue,block,recurring:false,weekday:date.getDay()});
+      persist();renderAll();showToast(`${formatDate(date,{weekday:"short",month:"short",day:"numeric"})} ${BLOCK_LABELS[block].toLowerCase()} marked unavailable`);
+    }
+
     function openSettings(){$("settingsBackdrop").classList.add("open");$("settingsDrawer").classList.add("open");document.body.style.overflow="hidden"}
     function closeSettings(){$("settingsBackdrop").classList.remove("open");$("settingsDrawer").classList.remove("open");document.body.style.overflow=""}
     function saveAvailability(){for(const block of BLOCKS)state.settings.blockTimes[block]={start:$(block+"Start").value,end:$(block+"End").value};state.settings.highEnergyBlock=$("highEnergyBlock").value;state.settings.timerSound=$("timerSound").value;persist();renderAll()}
-    function addUnavailable(){const date=$("unavailableDate").value,block=$("unavailableBlock").value,recurring=$("unavailableRecurring").checked;if(!date){showToast("Choose a date");return}state.settings.unavailableBlocks.push({id:uid(),date,block,recurring,weekday:parseDate(date).getDay()});persist();renderAll();showToast("Unavailable time added")}
+    function addUnavailable(){const date=$("unavailableDate").value,block=$("unavailableBlock").value,recurring=$("unavailableRecurring").checked;if(!date){showToast("Choose a date");return}const parsed=parseDate(date),weekday=parsed.getDay();if(unavailableRuleExists({date,block,recurring,weekday})){showToast("That unavailable block already exists");return}state.settings.unavailableBlocks.push({id:uid(),date:recurring?"":date,block,recurring,weekday});persist();renderAll();showToast(recurring?`Blocked every ${formatWeekday(weekday)} ${BLOCK_LABELS[block].toLowerCase()}`:"Unavailable time added")}
     function deleteUnavailable(id){state.settings.unavailableBlocks=state.settings.unavailableBlocks.filter(rule=>rule.id!==id);persist();renderAll()}
 
     function handleAction(event){
       const target=event.target.closest("[data-action]");if(!target)return;const action=target.dataset.action;
-      if(action==="add")openTaskModal();if(action==="start")startFocus(target.dataset.key);if(action==="complete")toggleSession(target.dataset.key);if(action==="move")openMove(target.dataset.key);if(action==="edit")openTaskModal(target.dataset.id);if(action==="delete")deleteTask(target.dataset.id);if(action==="toggle-task")toggleTask(target.dataset.id);if(action==="delete-unavailable")deleteUnavailable(target.dataset.id);
+      if(action==="add")openTaskModal();if(action==="start")startFocus(target.dataset.key);if(action==="complete")toggleSession(target.dataset.key);if(action==="move")openMove(target.dataset.key);if(action==="edit")openTaskModal(target.dataset.id);if(action==="delete")deleteTask(target.dataset.id);if(action==="toggle-task")toggleTask(target.dataset.id);if(action==="delete-unavailable")deleteUnavailable(target.dataset.id);if(action==="toggle-unavailable")toggleBlockUnavailable(target.dataset.date,target.dataset.block);
     }
 
     function setCloudStatus(message){$("cloudStatus").textContent=message}
@@ -1478,7 +1586,7 @@
       document.querySelectorAll(".nav-btn").forEach(button=>button.addEventListener("click",()=>switchView(button.dataset.view)));
       ["freshAddTaskButton","todayAddTaskButton","planAddTaskButton","tasksAddTaskButton"].forEach(id=>$(id).addEventListener("click",()=>openTaskModal()));
       $("openPlanButton").addEventListener("click",()=>switchView("planView"));$("adjustTodayButton").addEventListener("click",openAdjust);$("fixPlanButton").addEventListener("click",openAdjust);
-      $("balanceWeekButton").addEventListener("click",balanceWeek);$("previousWeekButton").addEventListener("click",()=>{if(state.weekOffset>0){state.weekOffset--;renderAll()}});$("nextWeekButton").addEventListener("click",()=>{state.weekOffset++;renderAll()});
+      $("balanceWeekButton").addEventListener("click",balanceWeek);$("planUnavailableButton").addEventListener("click",()=>openUnavailableModal({mode:"weekly"}));$("previousWeekButton").addEventListener("click",()=>{if(state.weekOffset>0){state.weekOffset--;renderAll()}});$("nextWeekButton").addEventListener("click",()=>{state.weekOffset++;renderAll()});
       document.querySelectorAll(".filter-btn").forEach(button=>button.addEventListener("click",()=>{state.taskFilter=button.dataset.filter;document.querySelectorAll(".filter-btn").forEach(item=>item.classList.toggle("active",item===button));renderTasks()}));
 
       $("closeTaskModal").addEventListener("click",closeTaskModal);$("taskBackdrop").addEventListener("click",closeTaskModal);$("wizardBackButton").addEventListener("click",()=>setWizardStep(state.wizardStep-1));$("wizardNextButton").addEventListener("click",()=>{if(state.wizardStep===1&&!$("taskName").value.trim()){showToast("Add a task name");return}setWizardStep(state.wizardStep+1)});$("taskForm").addEventListener("submit",saveTask);
@@ -1489,11 +1597,12 @@
 
       $("closeAdjustModal").addEventListener("click",closeAdjust);$("adjustBackdrop").addEventListener("click",closeAdjust);$("lighterTodayChoice").addEventListener("click",makeTodayLighter);$("balanceChoice").addEventListener("click",balanceWeek);$("blockTodayChoice").addEventListener("click",blockRestOfToday);
       $("closeMoveModal").addEventListener("click",closeMove);$("moveBackdrop").addEventListener("click",closeMove);$("confirmMoveButton").addEventListener("click",confirmMove);
+      $("closeUnavailableModal").addEventListener("click",closeUnavailableModal);$("unavailableBackdrop").addEventListener("click",closeUnavailableModal);$("confirmUnavailableButton").addEventListener("click",addUnavailableFromPlan);document.querySelectorAll("[data-unavailable-mode]").forEach(button=>button.addEventListener("click",()=>setUnavailableMode(button.dataset.unavailableMode)));
       $("pauseTimerButton").addEventListener("click",toggleTimer);$("resetTimerButton").addEventListener("click",resetTimer);$("finishSessionButton").addEventListener("click",finishTimerSession);$("closeFocusButton").addEventListener("click",closeFocus);
 
       $("settingsButton").addEventListener("click",openSettings);$("closeSettingsButton").addEventListener("click",closeSettings);$("settingsBackdrop").addEventListener("click",closeSettings);["morningStart","morningEnd","afternoonStart","afternoonEnd","eveningStart","eveningEnd","highEnergyBlock","timerSound"].forEach(id=>$(id).addEventListener("change",saveAvailability));$("addUnavailableButton").addEventListener("click",addUnavailable);
       $("clearAllButton").addEventListener("click",()=>{if(!confirm("Delete all tasks and plan progress?"))return;state.tasks=[];state.completedSessions.clear();state.manualMoves={};state.activeTimer=null;persist();renderAll();closeSettings();showToast("All tasks cleared")});
-      document.addEventListener("keydown",event=>{if(event.key!=="Escape")return;if(!$("taskModal").classList.contains("hidden"))closeTaskModal();else if(!$("moveModal").classList.contains("hidden"))closeMove();else if(!$("adjustModal").classList.contains("hidden"))closeAdjust();else if($("settingsDrawer").classList.contains("open"))closeSettings()});
+      document.addEventListener("keydown",event=>{if(event.key!=="Escape")return;if(!$("taskModal").classList.contains("hidden"))closeTaskModal();else if(!$("moveModal").classList.contains("hidden"))closeMove();else if(!$("unavailableModal").classList.contains("hidden"))closeUnavailableModal();else if(!$("adjustModal").classList.contains("hidden"))closeAdjust();else if($("settingsDrawer").classList.contains("open"))closeSettings()});
     }
 
     function boot(){loadLocal();bindEvents();renderAll();if(state.activeTimer){renderTimer();$("focusOverlay").classList.remove("hidden");document.body.style.overflow="hidden";if(state.activeTimer.running)startTimerTicker()}initializeFirebase();setInterval(()=>{renderHeader();buildPlan();renderToday();renderPlan();renderTasks()},60000)}
