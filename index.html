@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#6f8798" />
   <title>Task-it-up</title>
+  <!-- Scheduler: least-slack-first + cost-based placement + local-search balancing -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%232f6f68'/%3E%3Cpath d='M18 33l9 9 20-23' fill='none' stroke='white' stroke-width='7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
   <style>
     :root{
@@ -676,6 +677,53 @@
     }
   </style>
 
+
+  <style id="gentle-workflow-refinement">
+    /* Calm hierarchy: size and spacing carry emphasis, not bold type. */
+    body *{font-weight:400!important}
+    body,button,input,select,textarea,h1,h2,h3,h4,strong,b,
+    .brand h1,.btn,.nav-btn,.eyebrow,.next-label,.today-hero h2,.today-summary,
+    .fit-copy strong,.next-task,.pill,.section-head h3,.section-head span,
+    .session-title,.session-sub,.session-check,.round-action,.toolbar h2,.toolbar p,
+    .week-label,.week-label small,.week-arrow,.day-head strong,.day-head span,.day-load,
+    .block-head,.availability-copy,.plan-item-title,.plan-item-meta,.filter-btn,.task-card h3,
+    .task-progress-copy,.modal-head h2,.wizard-step h3,.field label,.choice,.feeling,
+    .more-toggle,.switch-copy strong,.switch-copy span,.settings-card h3,
+    .settings-time-row strong,.settings-time-row label,.unavailable-row strong,
+    .focus-kicker,.focus-task,.focus-session,.timer-time,.toast{
+      font-weight:400!important;
+    }
+
+    .today-hero{position:relative}
+    .home-leaf{
+      position:absolute;right:2px;top:-4px;width:74px;height:74px;
+      color:var(--sage);opacity:.72;pointer-events:none;
+      transform:rotate(5deg);
+    }
+    .home-leaf svg{display:block;width:100%;height:100%}
+    .home-leaf path{vector-effect:non-scaling-stroke}
+
+    .suggestion-nudge{
+      max-width:590px;margin:18px 0 0;padding:14px 16px;border-radius:16px;
+      background:var(--sage-soft);border:1px solid #d6e2da;color:#65746c;
+      font-size:.9rem;line-height:1.5;
+    }
+    .suggestion-nudge .tiny-leaf{display:inline-block;margin-right:7px;color:var(--sage);font-size:1.05rem}
+    .next-actions .btn[data-action="something-else"]{background:transparent}
+    .next-actions .btn[disabled]{opacity:.58;cursor:default}
+
+    .resume-note{
+      display:inline-flex;align-items:center;gap:7px;margin-top:12px;color:var(--muted);
+      font-size:.76rem;
+    }
+    .resume-note::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--sage)}
+
+    @media(max-width:720px){
+      .home-leaf{width:58px;height:58px;right:-2px;top:2px;opacity:.58}
+      .suggestion-nudge{font-size:.86rem}
+    }
+  </style>
+
 </head>
 <body>
   <div class="app">
@@ -708,6 +756,14 @@
           <div class="today-main">
             <div class="panel today-hero">
               <div class="eyebrow">Today</div>
+              <div class="home-leaf" aria-hidden="true">
+                <svg viewBox="0 0 90 90" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M18 69C41 61 55 44 69 19" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+                  <path d="M40 54C27 53 18 46 16 34C28 33 39 39 40 54Z" fill="currentColor" fill-opacity=".18" stroke="currentColor" stroke-width="1.7"/>
+                  <path d="M53 41C49 28 55 17 67 12C72 25 67 37 53 41Z" fill="currentColor" fill-opacity=".18" stroke="currentColor" stroke-width="1.7"/>
+                  <path d="M29 63C22 58 17 58 11 60" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                </svg>
+              </div>
               <h2 id="todayHeadline">Let’s make today manageable.</h2>
               <div class="today-summary" id="todaySummary">Your plan is being prepared.</div>
             </div>
@@ -950,6 +1006,7 @@
     const SETTINGS_KEY="taskItUpSettingsV3";
     const PROGRESS_KEY="taskItUpProgressV1";
     const MANUAL_MOVES_KEY="taskItUpManualMovesV1";
+    const AUTO_PLACEMENTS_KEY="taskItUpAutoPlacementsV1";
     const TIMER_KEY="taskItUpTimerV2";
     const CLOUD_LOCAL_REVISION_KEY="taskItUpLocalRevisionV1";
     const OLD_TASKS_KEY="taskItUpTasksV2";
@@ -969,10 +1026,10 @@
 
     const $=id=>document.getElementById(id);
     const state={
-      tasks:[],settings:structuredCloneSafe(defaultSettings),completedSessions:new Set(),manualMoves:{},
-      masterPlan:[],unscheduled:[],instanceKeys:new Map(),taskProgress:new Map(),weekOffset:0,taskFilter:"active",
+      tasks:[],settings:structuredCloneSafe(defaultSettings),completedSessions:new Set(),manualMoves:{},autoPlacements:{},
+      masterPlan:[],unscheduled:[],overtimeMinutes:0,instanceKeys:new Map(),taskProgress:new Map(),weekOffset:0,taskFilter:"active",
       wizardStep:1,wizardDeadlineChoice:"none",wizardEstimate:30,wizardFeeling:"neutral",wizardSplit:"split",
-      activeMoveKey:null,unavailableMode:"weekly",activeTimer:null,timerTicker:null,audioContext:null,
+      activeMoveKey:null,unavailableMode:"weekly",activeTimer:null,timerTicker:null,audioContext:null,todaySuggestionKey:null,todayNudgeKey:null,
       firebaseAuth:null,firebaseDb:null,firebaseUser:null,firebaseFunctions:null,cloudUnsubscribe:null,cloudSaveTimer:null,
       applyingCloudState:false,localRevisionAt:0,firebaseInitialized:false
     };
@@ -1046,6 +1103,7 @@
       const progress=safeParse(storageGet(PROGRESS_KEY),[]);
       state.completedSessions=new Set(Array.isArray(progress)?progress:[]);
       state.manualMoves=safeParse(storageGet(MANUAL_MOVES_KEY),{})||{};
+      state.autoPlacements=safeParse(storageGet(AUTO_PLACEMENTS_KEY),{})||{};
       state.activeTimer=safeParse(storageGet(TIMER_KEY),null);
       state.localRevisionAt=Number(storageGet(CLOUD_LOCAL_REVISION_KEY)||0);
       restoreTimerElapsed();
@@ -1056,12 +1114,14 @@
       storageSet(SETTINGS_KEY,JSON.stringify(state.settings));
       storageSet(PROGRESS_KEY,JSON.stringify([...state.completedSessions]));
       storageSet(MANUAL_MOVES_KEY,JSON.stringify(state.manualMoves));
+      storageSet(AUTO_PLACEMENTS_KEY,JSON.stringify(state.autoPlacements));
       storageSet(TIMER_KEY,JSON.stringify(state.activeTimer));
       if(updateRevision){state.localRevisionAt=Date.now();storageSet(CLOUD_LOCAL_REVISION_KEY,String(state.localRevisionAt));}
     }
     function persist(){persistLocal(true);queueCloudSave()}
 
     function focusMinutes(task){return task.feeling==="difficult"?20:task.feeling==="easy"?40:30}
+    function difficultyWeight(task){return task.feeling==="difficult"?1.5:task.feeling==="easy"?.75:1}
     function blockCapacity(block){const times=state.settings.blockTimes[block];return Math.min(MAX_BLOCK_MINUTES,Math.max(0,timeToMinutes(times.end)-timeToMinutes(times.start)))}
     function blockState(dayIndex,block){
       if(dayIndex>0)return "future";if(dayIndex<0)return "ended";
@@ -1077,12 +1137,15 @@
       }
       return capacity;
     }
-    function usableDayCapacity(day){return BLOCKS.reduce((sum,block)=>sum+usableBlockCapacity(day,block),0)}
+    function usableDayCapacity(day){return Math.min(MAX_DAY_MINUTES,BLOCKS.reduce((sum,block)=>sum+usableBlockCapacity(day,block),0))}
     function scheduledMinutes(items){return items.reduce((sum,item)=>sum+(isSessionDone(item.key)?0:item.minutes),0)}
+    function cognitiveMinutes(items){return items.reduce((sum,item)=>sum+(isSessionDone(item.key)?0:item.minutes*difficultyWeight(item.task)),0)}
     function blockLoad(day,block){return scheduledMinutes(day?.blocks?.[block]||[])}
+    function dayCognitiveLoad(day){return cognitiveMinutes(day?.items||[])}
+    function blockCognitiveLoad(day,block){return cognitiveMinutes(day?.blocks?.[block]||[])}
     function difficultBlockLoad(day,block){return (day?.blocks?.[block]||[]).reduce((sum,item)=>sum+(!isSessionDone(item.key)&&item.task.feeling==="difficult"?item.minutes:0),0)}
     function difficultBlockCount(day,block){return (day?.blocks?.[block]||[]).filter(item=>!isSessionDone(item.key)&&item.task.feeling==="difficult").length}
-    function availableCapacity(day,block){return Math.max(0,usableBlockCapacity(day,block)-blockLoad(day,block))}
+    function availableCapacity(day,block){return Math.max(0,Math.min(usableBlockCapacity(day,block)-blockLoad(day,block),usableDayCapacity(day)-day.load))}
     function unavailableRulesFor(date,block){
       return state.settings.unavailableBlocks.filter(rule=>rule.block===block&&(rule.recurring?Number(rule.weekday)===date.getDay():rule.date===dateKey(date)));
     }
@@ -1105,25 +1168,24 @@
       return dates;
     }
 
-    function splitMinutes(task,availableDays){
+    function splitMinutes(task){
       const total=Math.max(5,Math.round(task.estimateMinutes));
-      if(task.allAtOnce){
-        const count=Math.ceil(total/MAX_BLOCK_MINUTES);const base=Math.floor(total/count);let remainder=total-base*count;
-        return Array.from({length:count},()=>base+(remainder-->0?1:0));
-      }
-      const target=focusMinutes(task);let count=Math.max(1,Math.ceil(total/target));
-      if(availableDays>0&&count<availableDays&&total/availableDays>=10)count=availableDays;
+      if(task.allAtOnce)return [total];
+      const target=focusMinutes(task);
+      let count=Math.max(1,Math.round(total/target));
+      count=Math.min(count,Math.max(1,Math.floor(total/10)));
       const base=Math.floor(total/count);let remainder=total-base*count;
       return Array.from({length:count},()=>base+(remainder-->0?1:0)).filter(Boolean);
     }
 
     function sessionLabel(index,total){if(total===1)return "Finish";if(index===0)return "Start";if(index===total-1)return "Finish";return "Continue"}
+    function slotOrdinal(dayIndex,block){return dayIndex*BLOCKS.length+BLOCKS.indexOf(block)}
 
     const SCHEDULE_PHASES={
-      initial:{day:95,block:175,difficulty:145,difficultCount:18,target:.9,sameDay:34,sameBlock:16,overload:25000},
-      overload:{day:25,block:40,difficulty:20,difficultCount:4,target:.3,sameDay:8,sameBlock:4,overload:120000},
-      difficulty:{day:55,block:80,difficulty:420,difficultCount:65,target:.5,sameDay:20,sameBlock:10,overload:120000},
-      general:{day:150,block:245,difficulty:150,difficultCount:20,target:.7,sameDay:36,sameBlock:18,overload:120000}
+      initial:{day:105,block:180,cognitive:155,difficulty:75,difficultCount:14,target:5,sameDay:30,sameBlock:46,stability:32,overload:45000},
+      overload:{day:45,block:65,cognitive:40,difficulty:20,difficultCount:5,target:1,sameDay:8,sameBlock:10,stability:8,overload:150000},
+      difficulty:{day:75,block:110,cognitive:300,difficulty:480,difficultCount:70,target:2,sameDay:20,sameBlock:28,stability:18,overload:150000},
+      general:{day:155,block:250,cognitive:190,difficulty:100,difficultCount:18,target:4,sameDay:36,sameBlock:52,stability:26,overload:150000}
     };
 
     function slotAllowed(item,day,block){
@@ -1141,29 +1203,43 @@
       return blockLoad(day,block)+minutes<=usableBlockCapacity(day,block)&&day.load+minutes<=usableDayCapacity(day);
     }
 
+    function placementChangeDistance(item,day,block){
+      const prior=item.priorSlot;if(!prior)return 0;
+      if(prior.date===dateKey(day.date)&&prior.block===block)return 0;
+      const priorDay=state.masterPlan.findIndex(candidate=>dateKey(candidate.date)===prior.date);
+      if(priorDay<0)return 1;
+      return 1+Math.abs(priorDay-day.index)+(prior.block===block?0:.35);
+    }
+
     function slotScore(item,day,block,phaseName="initial"){
       const weights=SCHEDULE_PHASES[phaseName]||SCHEDULE_PHASES.initial;
       const minutes=isSessionDone(item.key)?0:item.minutes;
+      const weight=difficultyWeight(item.task);
       const blockCap=Math.max(1,usableBlockCapacity(day,block));
       const dayCap=Math.max(1,usableDayCapacity(day));
-      const blockAfter=blockLoad(day,block)+minutes;
-      const dayAfter=day.load+minutes;
-      const blockOver=Math.max(0,blockAfter-blockCap);
-      const dayOver=Math.max(0,dayAfter-dayCap);
+      const blockBefore=blockLoad(day,block),blockAfter=blockBefore+minutes;
+      const dayBefore=day.load,dayAfter=dayBefore+minutes;
+      const blockCogBefore=blockCognitiveLoad(day,block),blockCogAfter=blockCogBefore+minutes*weight;
+      const dayCogBefore=dayCognitiveLoad(day),dayCogAfter=dayCogBefore+minutes*weight;
+      const blockOver=Math.max(0,blockAfter-blockCap),dayOver=Math.max(0,dayAfter-dayCap);
       const sameTaskDay=day.items.filter(other=>other.taskId===item.taskId&&!isSessionDone(other.key)).length;
       const sameTaskBlock=day.blocks[block].filter(other=>other.taskId===item.taskId&&!isSessionDone(other.key)).length;
+      const normalized=x=>x*x;
       let score=0;
       score+=(blockOver*blockOver+dayOver*dayOver)*weights.overload;
-      score+=Math.pow(blockAfter/blockCap,2)*weights.block;
-      score+=Math.pow(dayAfter/dayCap,2)*weights.day;
-      score+=Math.abs(day.index-item.targetDayIndex)*weights.target;
+      score+=(normalized(blockAfter/blockCap)-normalized(blockBefore/blockCap))*weights.block;
+      score+=(normalized(dayAfter/dayCap)-normalized(dayBefore/dayCap))*weights.day;
+      score+=(normalized(blockCogAfter/(blockCap*1.15))-normalized(blockCogBefore/(blockCap*1.15)))*weights.cognitive;
+      score+=(normalized(dayCogAfter/(dayCap*1.15))-normalized(dayCogBefore/(dayCap*1.15)))*(weights.cognitive*.45);
+      score+=Math.abs(slotOrdinal(day.index,block)-item.targetSlotOrdinal)*weights.target;
       score+=sameTaskDay*weights.sameDay+sameTaskBlock*weights.sameBlock;
+      score+=placementChangeDistance(item,day,block)*weights.stability;
       if(item.task.feeling==="difficult"){
         const difficultAfter=difficultBlockLoad(day,block)+minutes;
         const difficultCountAfter=difficultBlockCount(day,block)+1;
-        score+=Math.pow(difficultAfter/blockCap,2)*weights.difficulty;
-        score+=Math.pow(difficultCountAfter,2)*(weights.difficultCount||0);
-        score+=block===state.settings.highEnergyBlock?-10:3;
+        score+=(normalized(difficultAfter/blockCap)-normalized(difficultBlockLoad(day,block)/blockCap))*weights.difficulty;
+        score+=normalized(difficultCountAfter)*(weights.difficultCount||0);
+        score+=block===state.settings.highEnergyBlock?-18:5;
       }
       if(day.index===0&&blockState(0,block)==="active")score-=3;
       score+=BLOCKS.indexOf(block)*.001+day.index*.00001;
@@ -1203,15 +1279,56 @@
       return {day,block:move.block,score:-999,pinned:true};
     }
 
+    function completedPriorSlotFor(item){
+      if(!isSessionDone(item.key)||!item.priorSlot)return null;
+      const dayIndex=state.masterPlan.findIndex(day=>dateKey(day.date)===item.priorSlot.date);if(dayIndex<0)return null;
+      const day=state.masterPlan[dayIndex],block=item.priorSlot.block;
+      if(!BLOCKS.includes(block)||day.index<item.earliestDayIndex||day.index>item.latestDayIndex)return null;
+      return {day,block,pinned:true,archived:true};
+    }
+
     function deadlineIsNear(item){return item.dueDate&&daysBetween(dateStart(),item.dueDate)<=2}
+
+    function feasibleCapacityBeforeDeadline(item){
+      let total=0,maxSingle=0;
+      for(let dayIndex=item.earliestDayIndex;dayIndex<=item.latestDayIndex;dayIndex++){
+        const day=state.masterPlan[dayIndex];if(!day)continue;
+        let dayFree=Math.max(0,usableDayCapacity(day)-day.load),dayBlockFree=0;
+        for(const block of BLOCKS){
+          if(!slotAllowed(item,day,block))continue;
+          const free=Math.max(0,usableBlockCapacity(day,block)-blockLoad(day,block));
+          dayBlockFree+=free;maxSingle=Math.max(maxSingle,Math.min(free,dayFree));
+        }
+        total+=Math.min(dayFree,dayBlockFree);
+      }
+      return item.task.allAtOnce?maxSingle:total;
+    }
+
+    function schedulingPriority(item,remainingMinutes){
+      const slack=feasibleCapacityBeforeDeadline(item)-remainingMinutes;
+      return {flexible:item.flexible?1:0,slack,latest:item.latestDayIndex,window:item.latestDayIndex-item.earliestDayIndex,allAtOnce:item.task.allAtOnce?0:1,difficult:item.task.feeling==="difficult"?0:1,target:item.targetSlotOrdinal,minutes:item.minutes,key:item.key};
+    }
+
+    function comparePriority(pa,pb){
+      return pa.flexible-pb.flexible||pa.slack-pb.slack||pa.latest-pb.latest||pa.window-pb.window||pa.allAtOnce-pb.allAtOnce||pa.difficult-pb.difficult||pa.target-pb.target||pb.minutes-pa.minutes||pa.key.localeCompare(pb.key);
+    }
+
+    function takeMostUrgentInstance(pendingByInstance){
+      let bestId=null,bestPriority=null;
+      for(const [instanceId,items] of pendingByInstance){
+        const representative=items[0],remaining=items.reduce((sum,item)=>sum+item.minutes,0);
+        const priority=schedulingPriority(representative,remaining);
+        if(bestPriority===null||comparePriority(priority,bestPriority)<0){bestPriority=priority;bestId=instanceId}
+      }
+      const items=pendingByInstance.get(bestId)||[];pendingByInstance.delete(bestId);
+      return items.sort((a,b)=>a.chunkIndex-b.chunkIndex||a.key.localeCompare(b.key));
+    }
 
     function currentSlotStress(item,phaseName){
       const day=state.masterPlan[item.dayIndex];if(!day||!item.block)return -Infinity;
-      if(phaseName==="overload"){
-        return Math.max(0,blockLoad(day,item.block)-usableBlockCapacity(day,item.block))+Math.max(0,day.load-usableDayCapacity(day));
-      }
-      if(phaseName==="difficulty")return item.task.feeling==="difficult"?difficultBlockLoad(day,item.block)/Math.max(1,usableBlockCapacity(day,item.block)):0;
-      return blockLoad(day,item.block)/Math.max(1,usableBlockCapacity(day,item.block))+day.load/Math.max(1,usableDayCapacity(day));
+      if(phaseName==="overload")return Math.max(0,blockLoad(day,item.block)-usableBlockCapacity(day,item.block))+Math.max(0,day.load-usableDayCapacity(day));
+      if(phaseName==="difficulty")return item.task.feeling==="difficult"?blockCognitiveLoad(day,item.block)/Math.max(1,usableBlockCapacity(day,item.block)):0;
+      return blockLoad(day,item.block)/Math.max(1,usableBlockCapacity(day,item.block))+day.load/Math.max(1,usableDayCapacity(day))+blockCognitiveLoad(day,item.block)/Math.max(1,usableBlockCapacity(day,item.block));
     }
 
     function rebalancePhase(items,phaseName,passes=2){
@@ -1225,11 +1342,36 @@
           const originalScore=slotScore(item,originalDay,originalBlock,phaseName);
           let best=chooseSlotForItem(item,phaseName,false);
           if(!best&&deadlineIsNear(item))best=chooseSlotForItem(item,phaseName,true);
-          if(best&&(best.day.index!==originalDay.index||best.block!==originalBlock)&&best.score<originalScore-.25){
-            placeItem(item,best);moved++;
-          }else placeItem(item,{day:originalDay,block:originalBlock});
+          if(best&&(best.day.index!==originalDay.index||best.block!==originalBlock)&&best.score<originalScore-.35){placeItem(item,best);moved++}
+          else placeItem(item,{day:originalDay,block:originalBlock});
         }
         if(!moved)break;
+      }
+    }
+
+    function pairCost(a,slotA,b,slotB,phaseName){
+      let cost=slotScore(a,slotA.day,slotA.block,phaseName);placeItem(a,slotA);
+      cost+=slotScore(b,slotB.day,slotB.block,phaseName);placeItem(b,slotB);
+      removeItem(b);removeItem(a);return cost;
+    }
+
+    function rebalanceSwaps(items,phaseName="general",passes=2){
+      const candidates=items.filter(item=>item.dayIndex!==null&&!item.pinned&&!isSessionDone(item.key)).sort((a,b)=>currentSlotStress(b,phaseName)-currentSlotStress(a,phaseName)).slice(0,72);
+      for(let pass=0;pass<passes;pass++){
+        let improved=false;
+        outer:for(let i=0;i<candidates.length;i++)for(let j=i+1;j<candidates.length;j++){
+          const a=candidates[i],b=candidates[j];if(a.dayIndex===b.dayIndex&&a.block===b.block)continue;
+          const slotA={day:state.masterPlan[a.dayIndex],block:a.block},slotB={day:state.masterPlan[b.dayIndex],block:b.block};
+          removeItem(b);removeItem(a);
+          const before=pairCost(a,slotA,b,slotB,phaseName);
+          let after=Infinity;
+          if(slotAllowed(a,slotB.day,slotB.block)&&slotAllowed(b,slotA.day,slotA.block)){
+            if(slotHasHardCapacity(a,slotB.day,slotB.block)){placeItem(a,slotB);const fitsB=slotHasHardCapacity(b,slotA.day,slotA.block);removeItem(a);if(fitsB)after=pairCost(a,slotB,b,slotA,phaseName)}
+          }
+          if(after<before-.5){placeItem(a,slotB);placeItem(b,slotA);improved=true;break outer}
+          placeItem(a,slotA);placeItem(b,slotB);
+        }
+        if(!improved)break;
       }
     }
 
@@ -1237,12 +1379,42 @@
       rebalancePhase(items,"overload",3);
       rebalancePhase(items,"difficulty",2);
       rebalancePhase(items,"general",3);
+      rebalanceSwaps(items,"general",2);
+    }
+
+    function candidateSlotsForInstance(first,last,task,dueDate){
+      const slots=[];
+      for(let dayIndex=first;dayIndex<=last;dayIndex++){
+        const day=state.masterPlan[dayIndex];if(!day)continue;
+        for(const block of BLOCKS){
+          if(usableBlockCapacity(day,block)<=0)continue;
+          if(dueDate&&sameDay(day.date,dueDate)&&task.deadlineBlock&&BLOCKS.indexOf(block)>BLOCKS.indexOf(task.deadlineBlock))continue;
+          slots.push({dayIndex,block,ordinal:slotOrdinal(dayIndex,block)});
+        }
+      }
+      return slots;
+    }
+
+    function calculateOvertime(){
+      let overtime=0;
+      for(const day of state.masterPlan){
+        let blockExcess=0;
+        for(const block of BLOCKS)blockExcess+=Math.max(0,blockLoad(day,block)-usableBlockCapacity(day,block));
+        overtime+=Math.max(blockExcess,Math.max(0,day.load-usableDayCapacity(day)));
+      }
+      state.overtimeMinutes=Math.round(overtime);
+    }
+
+    function rememberAutomaticPlacements(allItems){
+      const next={};
+      for(const item of allItems)if(item.dayIndex!==null)next[item.key]={date:dateKey(state.masterPlan[item.dayIndex].date),block:item.block};
+      state.autoPlacements=next;storageSet(AUTO_PLACEMENTS_KEY,JSON.stringify(next));
     }
 
     function buildPlan(){
       const horizonDays=Math.max(90,(state.weekOffset+2)*7),start=dateStart();
       state.masterPlan=Array.from({length:horizonDays},(_,index)=>createDay(addDays(start,index),index));
-      state.unscheduled=[];state.instanceKeys=new Map();state.taskProgress=new Map();
+      state.unscheduled=[];state.overtimeMinutes=0;state.instanceKeys=new Map();state.taskProgress=new Map();
       const horizonEnd=state.masterPlan.at(-1).date,instances=[];
 
       state.tasks.filter(task=>!task.completed).forEach(task=>{
@@ -1257,46 +1429,46 @@
         }else instances.push({task,dueDate:addDays(start,13),windowStart:start,instanceId:`${task.id}-flex`,flexible:true});
       });
 
-      instances.sort((a,b)=>a.flexible!==b.flexible?(a.flexible?1:-1):(a.dueDate-b.dueDate)||((a.dueDate-a.windowStart)-(b.dueDate-b.windowStart))||((b.task.allAtOnce?1:0)-(a.task.allAtOnce?1:0))||((b.task.feeling==="difficult")-(a.task.feeling==="difficult"))||String(a.task.createdAt).localeCompare(String(b.task.createdAt)));
-
       const allItems=[];
       for(const instance of instances){
         const first=clamp(daysBetween(start,instance.windowStart),0,state.masterPlan.length-1);
         const last=clamp(daysBetween(start,instance.dueDate),0,state.masterPlan.length-1);
-        const dayCount=Math.max(1,last-first+1);
-        const chunks=splitMinutes(instance.task,dayCount),keys=[];
+        const chunks=splitMinutes(instance.task),keys=[];
         chunks.forEach((minutes,index)=>keys.push(`${instance.instanceId}|${index}|${chunks.length}`));
         state.instanceKeys.set(instance.instanceId,keys);
+        const preferredSlots=candidateSlotsForInstance(first,last,instance.task,instance.dueDate);
         chunks.forEach((minutes,index)=>{
-          const target=chunks.length===1?first:Math.round(first+index*(last-first)/Math.max(1,chunks.length-1));
-          allItems.push({key:keys[index],instanceId:instance.instanceId,taskId:instance.task.id,task:instance.task,minutes,label:sessionLabel(index,chunks.length),chunkIndex:index,chunkCount:chunks.length,dueDate:instance.dueDate,flexible:instance.flexible,earliestDayIndex:first,latestDayIndex:last,targetDayIndex:target,block:"",dayIndex:null,pinned:false});
+          const targetIndex=preferredSlots.length?(chunks.length===1?Math.floor((preferredSlots.length-1)/2):Math.round(index*(preferredSlots.length-1)/Math.max(1,chunks.length-1))):0;
+          const target=preferredSlots[targetIndex]||{dayIndex:first,block:"morning",ordinal:slotOrdinal(first,"morning")};
+          const key=keys[index],priorSlot=state.autoPlacements[key]||null;
+          allItems.push({key,instanceId:instance.instanceId,taskId:instance.task.id,task:instance.task,minutes,label:sessionLabel(index,chunks.length),chunkIndex:index,chunkCount:chunks.length,dueDate:instance.dueDate,flexible:instance.flexible,earliestDayIndex:first,latestDayIndex:last,targetDayIndex:target.dayIndex,targetBlock:target.block,targetSlotOrdinal:target.ordinal,priorSlot,block:"",dayIndex:null,pinned:false});
         });
       }
 
-      const pinned=allItems.filter(item=>state.manualMoves[item.key]);
-      for(const item of pinned){
-        const slot=manualSlotFor(item);
-        if(slot){item.pinned=true;placeItem(item,slot)}
-        else delete state.manualMoves[item.key];
-      }
+      const manual=allItems.filter(item=>state.manualMoves[item.key]);
+      for(const item of manual){const slot=manualSlotFor(item);if(slot){item.pinned=true;placeItem(item,slot)}else delete state.manualMoves[item.key]}
 
-      const automatic=allItems.filter(item=>item.dayIndex===null).sort((a,b)=>(a.latestDayIndex-b.latestDayIndex)||((a.latestDayIndex-a.earliestDayIndex)-(b.latestDayIndex-b.earliestDayIndex))||((b.task.allAtOnce?1:0)-(a.task.allAtOnce?1:0))||((b.task.feeling==="difficult")-(a.task.feeling==="difficult"))||(a.targetDayIndex-b.targetDayIndex)||(b.minutes-a.minutes)||a.key.localeCompare(b.key));
-      for(const item of automatic){
-        let slot=chooseSlotForItem(item,"initial",false);
-        if(!slot&&deadlineIsNear(item))slot=chooseSlotForItem(item,"initial",true);
-        if(slot)placeItem(item,slot);
+      const completed=allItems.filter(item=>item.dayIndex===null&&isSessionDone(item.key));
+      for(const item of completed){const slot=completedPriorSlotFor(item);if(slot){item.pinned=true;placeItem(item,slot)}}
+
+      const pendingByInstance=new Map();
+      for(const item of allItems.filter(item=>item.dayIndex===null&&!isSessionDone(item.key))){
+        if(!pendingByInstance.has(item.instanceId))pendingByInstance.set(item.instanceId,[]);
+        pendingByInstance.get(item.instanceId).push(item);
+      }
+      while(pendingByInstance.size){
+        const urgentItems=takeMostUrgentInstance(pendingByInstance);
+        for(const item of urgentItems){
+          let slot=chooseSlotForItem(item,"initial",false);
+          if(!slot&&deadlineIsNear(item))slot=chooseSlotForItem(item,"initial",true);
+          if(slot)placeItem(item,slot);
+          else state.unscheduled.push({taskId:item.task.id,name:item.task.name,minutes:item.minutes,dueDate:item.dueDate,allAtOnce:item.task.allAtOnce});
+        }
       }
 
       const placed=allItems.filter(item=>item.dayIndex!==null);
       balancePlacedItems(placed);
-
-      for(const item of allItems.filter(item=>item.dayIndex===null)){
-        let slot=chooseSlotForItem(item,"general",false);
-        if(!slot&&deadlineIsNear(item))slot=chooseSlotForItem(item,"general",true);
-        if(slot){placeItem(item,slot);placed.push(item)}
-        else if(!isSessionDone(item.key))state.unscheduled.push({taskId:item.task.id,name:item.task.name,minutes:item.minutes,dueDate:item.dueDate});
-      }
-      balancePlacedItems(placed);
+      calculateOvertime();rememberAutomaticPlacements(allItems);
 
       state.tasks.forEach(task=>{
         const allKeys=[];for(const [instanceId,keys] of state.instanceKeys)if(instanceId.startsWith(task.id+"-"))allKeys.push(...keys);
@@ -1308,6 +1480,41 @@
     function currentWeekDays(){const start=state.weekOffset*7;return state.masterPlan.slice(start,start+7)}
     function todayItems(){return state.masterPlan[0]?.items||[]}
     function incompleteTodayItems(){return todayItems().filter(item=>!isSessionDone(item.key)).sort((a,b)=>BLOCKS.indexOf(a.block)-BLOCKS.indexOf(b.block)||a.chunkIndex-b.chunkIndex)}
+
+    function usableTodaySuggestion(item){
+      return item&&!isSessionDone(item.key)&&blockState(0,item.block)!=="ended"&&!isUnavailable(dateStart(),item.block);
+    }
+    function suggestedTodayItem(remaining){
+      if(!remaining.length)return null;
+      const chosen=remaining.find(item=>item.key===state.todaySuggestionKey&&usableTodaySuggestion(item));
+      const fallback=remaining.find(usableTodaySuggestion)||remaining[0];
+      state.todaySuggestionKey=(chosen||fallback).key;
+      return chosen||fallback;
+    }
+    function switchableTodayItems(current,remaining){
+      if(!current)return [];
+      const differentTask=remaining.filter(item=>item.key!==current.key&&item.task.id!==current.task.id&&usableTodaySuggestion(item));
+      if(differentTask.length)return differentTask;
+      return remaining.filter(item=>item.key!==current.key&&usableTodaySuggestion(item));
+    }
+    function doSomethingElse(currentKey){
+      const remaining=incompleteTodayItems();
+      const current=remaining.find(item=>item.key===currentKey)||suggestedTodayItem(remaining);
+      const alternatives=switchableTodayItems(current,remaining);
+      if(!alternatives.length){
+        state.todaySuggestionKey=current?.key||null;
+        state.todayNudgeKey=current?.key||null;
+        renderToday();
+        return;
+      }
+      const currentPosition=remaining.findIndex(item=>item.key===current?.key);
+      const ordered=[...remaining.slice(currentPosition+1),...remaining.slice(0,currentPosition+1)];
+      const next=ordered.find(item=>alternatives.some(option=>option.key===item.key))||alternatives[0];
+      state.todaySuggestionKey=next.key;
+      state.todayNudgeKey=null;
+      renderToday();
+      showToast("Here’s another task you can do instead");
+    }
 
     function renderHeader(){
       $("headerDate").textContent=formatDate(new Date(),{weekday:"long",month:"long",day:"numeric"});
@@ -1322,20 +1529,29 @@
       $("todaySummary").textContent=remaining.length?`${formatMinutes(minutes)} is planned. Everything else can wait.`:hasActiveTasks?(nextFuture?`Next: ${nextFuture.item.task.name} on ${formatDate(nextFuture.day.date,{weekday:"long"})}.`:"Your remaining work is already placed later."):"Add it once. We’ll break it down and make room for it.";
       $("todayMinutesStat").textContent=formatMinutes(minutes);$("todayBlocksStat").textContent=remaining.length;$("weekMinutesStat").textContent=formatMinutes(weekRemaining);$("doneStat").textContent=completed.length;
 
-      const unscheduledMinutes=state.unscheduled.reduce((sum,item)=>sum+item.minutes,0);const banner=$("fitBanner");
-      banner.classList.toggle("warning",unscheduledMinutes>0);banner.classList.toggle("hidden",!unscheduledMinutes);$("fitIcon").textContent="!";
-      $("fitTitle").textContent=unscheduledMinutes?`${formatMinutes(unscheduledMinutes)} needs more room before its deadline.`:"";
-      $("fitDetail").textContent=unscheduledMinutes?"Open the plan to make a small adjustment.":"";
-      $("fixPlanButton").classList.toggle("hidden",!unscheduledMinutes);
+      const unscheduledMinutes=state.unscheduled.reduce((sum,item)=>sum+item.minutes,0),overtimeMinutes=state.overtimeMinutes||0;const banner=$("fitBanner");
+      const hasWarning=unscheduledMinutes>0||overtimeMinutes>0;banner.classList.toggle("warning",hasWarning);banner.classList.toggle("hidden",!hasWarning);$("fitIcon").textContent="!";
+      $("fitTitle").textContent=unscheduledMinutes?`${formatMinutes(unscheduledMinutes)} cannot fit before its deadline.`:overtimeMinutes?`${formatMinutes(overtimeMinutes)} of emergency overtime is scheduled.`:"";
+      $("fitDetail").textContent=unscheduledMinutes?"Add availability, move flexible work, or adjust a deadline.":overtimeMinutes?"The deadline is close and normal capacity was not enough.":"";
+      $("fixPlanButton").classList.toggle("hidden",!hasWarning);
 
-      const next=remaining[0];const nextCard=$("nextCard");nextCard.classList.toggle("empty-card",!next);
+      const next=suggestedTodayItem(remaining);const nextCard=$("nextCard");nextCard.classList.toggle("empty-card",!next);
       if(next){
-        nextCard.innerHTML=`<div class="next-label">Now</div><h3 class="next-task">${escapeHtml(next.task.name)}</h3><div class="next-meta"><span class="pill">${formatMinutes(next.minutes)}</span><span class="pill">${next.label}</span><span class="pill">${BLOCK_LABELS[next.block]}</span></div><div class="next-actions"><button class="btn btn-primary btn-large" data-action="start" data-key="${next.key}">Start</button><button class="btn btn-ghost" data-action="move" data-key="${next.key}">Not now</button></div>`;
+        if(state.todayNudgeKey&&state.todayNudgeKey!==next.key)state.todayNudgeKey=null;
+        const nudging=state.todayNudgeKey===next.key;
+        const pausedTimer=state.activeTimer&&state.activeTimer.key===next.key&&Number(state.activeTimer.remainingSeconds)>0;
+        const primaryAction=nudging?"start-short":pausedTimer?"resume-timer":"start";
+        const primaryCopy=nudging?"Start with 5 minutes":pausedTimer?"Resume":"Start";
+        const nudgeCopy=nudging?`<div class="suggestion-nudge"><span class="tiny-leaf">⌁</span>This is the only useful task that fits right now. You do not have to finish it. Give it five minutes, then decide whether to continue.</div>`:"";
+        const resumeCopy=pausedTimer&&!nudging?`<div class="resume-note">Your timer is paused at ${formatMinutes(Math.ceil(Number(state.activeTimer.remainingSeconds)/60))} remaining.</div>`:"";
+        const secondary=nudging?`<button class="btn btn-ghost" data-action="move" data-key="${next.key}">Move it</button>`:`<button class="btn btn-ghost" data-action="something-else" data-key="${next.key}">Do something else</button>`;
+        nextCard.innerHTML=`<div class="next-label">Now</div><h3 class="next-task">${escapeHtml(next.task.name)}</h3><div class="next-meta"><span class="pill">${formatMinutes(next.minutes)}</span><span class="pill">${next.label}</span><span class="pill">${BLOCK_LABELS[next.block]}</span></div>${nudgeCopy}${resumeCopy}<div class="next-actions"><button class="btn btn-primary btn-large" data-action="${primaryAction}" data-key="${next.key}">${primaryCopy}</button>${secondary}</div>`;
       }else{
+        state.todaySuggestionKey=null;state.todayNudgeKey=null;
         nextCard.innerHTML=`<button class="btn ${hasActiveTasks?"btn-soft":"btn-primary"} btn-large" data-action="add">${hasActiveTasks?"Add another task":"Add something"}</button>`;
       }
 
-      const later=remaining.slice(1);$("laterCount").textContent=later.length?`${later.length} more`:"";
+      const later=remaining.filter(item=>!next||item.key!==next.key);$("laterCount").textContent=later.length?`${later.length} more`:"";
       const laterPanel=$("todaySessionList").closest(".section-panel");laterPanel.classList.toggle("hidden",later.length===0);
       $("todaySessionList").innerHTML=later.map(sessionRowHtml).join("");
     }
@@ -1354,8 +1570,8 @@
       const days=currentWeekDays();const start=days[0]?.date||dateStart();const end=days.at(-1)?.date||addDays(start,6);
       $("weekLabel").innerHTML=`${formatDate(start,{month:"short",day:"numeric"})} – ${formatDate(end,{month:"short",day:"numeric",year:"numeric"})}<small>${state.weekOffset===0?"Current week":`Week ${state.weekOffset+1}`}</small>`;
       $("previousWeekButton").disabled=state.weekOffset===0;
-      const unscheduledMinutes=state.unscheduled.reduce((sum,item)=>sum+item.minutes,0);
-      $("planSubtitle").textContent=unscheduledMinutes?`${formatMinutes(unscheduledMinutes)} needs more available time before its deadline.`:"Work is divided into manageable focus blocks.";
+      const unscheduledMinutes=state.unscheduled.reduce((sum,item)=>sum+item.minutes,0),overtimeMinutes=state.overtimeMinutes||0;
+      $("planSubtitle").textContent=unscheduledMinutes?`${formatMinutes(unscheduledMinutes)} cannot fit before its deadline.`:overtimeMinutes?`${formatMinutes(overtimeMinutes)} of emergency overtime is being used near a deadline.`:"Work is balanced by deadline, capacity, and cognitive load.";
       $("weekGrid").innerHTML=days.map(day=>{
         const open=day.items.filter(item=>!isSessionDone(item.key));const done=day.items.filter(item=>isSessionDone(item.key));const total=open.reduce((sum,item)=>sum+item.minutes,0);const capacity=BLOCKS.reduce((sum,block)=>sum+(isUnavailable(day.date,block)?0:blockCapacity(block)),0);const percent=Math.min(100,Math.round(total/Math.max(1,capacity)*100));
         const blocks=BLOCKS.map(block=>{
@@ -1434,7 +1650,7 @@
       persist();renderAll();
     }
     function toggleTask(taskId){const task=state.tasks.find(item=>item.id===taskId);if(!task)return;task.completed=!task.completed;if(!task.completed){for(const key of [...state.completedSessions])if(key.startsWith(task.id+"-"))state.completedSessions.delete(key)}persist();renderAll();showToast(task.completed?"Task completed":"Task reopened")}
-    function deleteTask(taskId){const task=state.tasks.find(item=>item.id===taskId);if(!task)return;if(!confirm(`Delete “${task.name}”?`))return;state.tasks=state.tasks.filter(item=>item.id!==taskId);for(const key of [...state.completedSessions])if(key.startsWith(taskId+"-"))state.completedSessions.delete(key);Object.keys(state.manualMoves).forEach(key=>{if(key.startsWith(taskId+"-"))delete state.manualMoves[key]});persist();renderAll();showToast("Task deleted")}
+    function deleteTask(taskId){const task=state.tasks.find(item=>item.id===taskId);if(!task)return;if(!confirm(`Delete “${task.name}”?`))return;state.tasks=state.tasks.filter(item=>item.id!==taskId);for(const key of [...state.completedSessions])if(key.startsWith(taskId+"-"))state.completedSessions.delete(key);Object.keys(state.manualMoves).forEach(key=>{if(key.startsWith(taskId+"-"))delete state.manualMoves[key]});Object.keys(state.autoPlacements).forEach(key=>{if(key.startsWith(taskId+"-"))delete state.autoPlacements[key]});persist();renderAll();showToast("Task deleted")}
 
     function openMove(key){const located=findItem(key);if(!located)return;state.activeMoveKey=key;$("moveDate").min=dateKey(new Date());$("moveDate").value=dateKey(addDays(located.day.date,located.day.index===0?1:0));$("moveBlock").value=located.item.block||"morning";$("moveBackdrop").classList.remove("hidden");$("moveModal").classList.remove("hidden");document.body.style.overflow="hidden"}
     function closeMove(){state.activeMoveKey=null;$("moveBackdrop").classList.add("hidden");$("moveModal").classList.add("hidden");document.body.style.overflow=""}
@@ -1456,7 +1672,7 @@
       for(const item of items){if(total<=target)break;const placement=findLaterPlacement(item,0);if(placement){state.manualMoves[item.key]=placement;total-=item.minutes;moved++}}
       if(moved){persist();renderAll();showToast(`Moved ${moved} focus ${moved===1?"block":"blocks"} to later days`)}else showToast("Nothing flexible could be moved safely");closeAdjust();
     }
-    function balanceWeek(){state.manualMoves={};persist();renderAll();closeAdjust();showToast("Balanced deadlines, workload, and difficult tasks")}
+    function balanceWeek(){state.manualMoves={};state.autoPlacements={};persist();renderAll();closeAdjust();showToast("Balanced deadlines, workload, and difficult tasks")}
     function blockRestOfToday(){
       for(const block of BLOCKS){if(blockState(0,block)!=="ended"&&!isUnavailable(dateStart(),block))state.settings.unavailableBlocks.push({id:uid(),date:dateKey(new Date()),block,recurring:false,weekday:new Date().getDay()})}
       persist();renderAll();closeAdjust();showToast("Remaining work moved out of today")
@@ -1467,20 +1683,49 @@
     function restoreTimerElapsed(){
       const timer=state.activeTimer;if(!timer||!timer.running||!timer.updatedAt)return;const elapsed=Math.floor((Date.now()-timer.updatedAt)/1000);timer.remainingSeconds=Math.max(0,Number(timer.remainingSeconds||0)-elapsed);timer.updatedAt=Date.now();if(timer.remainingSeconds<=0)timer.running=false;
     }
-    function startFocus(key){
-      const located=findItem(key);if(!located)return;const totalSeconds=Math.max(60,located.item.minutes*60);
-      state.activeTimer={key,taskName:located.item.task.name,label:located.item.label,minutes:located.item.minutes,totalSeconds,remainingSeconds:totalSeconds,running:true,updatedAt:Date.now()};persist();renderTimer();$("focusOverlay").classList.remove("hidden");document.body.style.overflow="hidden";startTimerTicker();
+    function openFocusOverlay(){
+      renderTimer();$("focusOverlay").classList.remove("hidden");document.body.style.overflow="hidden";
+      if(state.activeTimer?.running)startTimerTicker();
     }
-    function startTimerTicker(){clearInterval(state.timerTicker);state.timerTicker=setInterval(()=>{const timer=state.activeTimer;if(!timer||!timer.running)return;const now=Date.now();const elapsed=Math.max(1,Math.floor((now-(timer.updatedAt||now))/1000));timer.remainingSeconds=Math.max(0,timer.remainingSeconds-elapsed);timer.updatedAt=now;if(timer.remainingSeconds<=0){timer.running=false;playTimerSound();showToast("Focus time complete")}
+    function startFocus(key,starterMinutes=0){
+      const located=findItem(key);if(!located)return;
+      const plannedMinutes=Math.max(1,located.item.minutes);
+      const timerMinutes=starterMinutes?Math.min(starterMinutes,plannedMinutes):plannedMinutes;
+      const totalSeconds=Math.max(60,timerMinutes*60);
+      state.todayNudgeKey=null;
+      state.activeTimer={key,taskName:located.item.task.name,label:located.item.label,minutes:timerMinutes,plannedMinutes,totalSeconds,remainingSeconds:totalSeconds,running:true,starterMode:Boolean(starterMinutes&&timerMinutes<plannedMinutes),updatedAt:Date.now()};
+      persist();openFocusOverlay();
+    }
+    function resumeTimer(){
+      if(!state.activeTimer)return;
+      state.activeTimer.running=true;state.activeTimer.updatedAt=Date.now();persist();openFocusOverlay();
+    }
+    function startTimerTicker(){clearInterval(state.timerTicker);state.timerTicker=setInterval(()=>{const timer=state.activeTimer;if(!timer||!timer.running)return;const now=Date.now();const elapsed=Math.max(1,Math.floor((now-(timer.updatedAt||now))/1000));timer.remainingSeconds=Math.max(0,timer.remainingSeconds-elapsed);timer.updatedAt=now;if(timer.remainingSeconds<=0){timer.running=false;playTimerSound();showToast(timer.starterMode?"Five minutes done. Continue if you can.":"Focus time complete")}
       renderTimer();if(timer.remainingSeconds%10===0)persistLocal(true);
     },1000)}
     function renderTimer(){
-      const timer=state.activeTimer;if(!timer)return;$("focusTaskName").textContent=timer.taskName;$("focusSessionMeta").textContent=`${timer.label} · ${formatMinutes(timer.minutes)}`;const seconds=Math.max(0,Math.round(timer.remainingSeconds));$("timerTime").textContent=`${String(Math.floor(seconds/60)).padStart(2,"0")}:${String(seconds%60).padStart(2,"0")}`;const elapsed=timer.totalSeconds-seconds;const degrees=clamp(elapsed/Math.max(1,timer.totalSeconds)*360,0,360);$("timerRing").style.setProperty("--timer-progress",degrees+"deg");$("pauseTimerButton").textContent=timer.running?"Pause":"Continue";
+      const timer=state.activeTimer;if(!timer)return;
+      const plannedMinutes=Number(timer.plannedMinutes||timer.minutes||0);
+      $("focusTaskName").textContent=timer.taskName;
+      $("focusSessionMeta").textContent=timer.starterMode?`A ${formatMinutes(timer.minutes)} start · ${formatMinutes(plannedMinutes)} planned`:`${timer.label} · ${formatMinutes(plannedMinutes)}`;
+      const seconds=Math.max(0,Math.round(timer.remainingSeconds));$("timerTime").textContent=`${String(Math.floor(seconds/60)).padStart(2,"0")}:${String(seconds%60).padStart(2,"0")}`;const elapsed=timer.totalSeconds-seconds;const degrees=clamp(elapsed/Math.max(1,timer.totalSeconds)*360,0,360);$("timerRing").style.setProperty("--timer-progress",degrees+"deg");$("pauseTimerButton").textContent=timer.running?"Pause":"Continue";
+      $("finishSessionButton").textContent=timer.starterMode?"Continue the full block":"Mark session done";
     }
     function toggleTimer(){if(!state.activeTimer)return;state.activeTimer.running=!state.activeTimer.running;state.activeTimer.updatedAt=Date.now();persist();renderTimer();if(state.activeTimer.running)startTimerTicker()}
     function resetTimer(){if(!state.activeTimer)return;state.activeTimer.remainingSeconds=state.activeTimer.totalSeconds;state.activeTimer.running=false;state.activeTimer.updatedAt=Date.now();persist();renderTimer()}
+    function continueFullBlock(){
+      const timer=state.activeTimer;if(!timer||!timer.starterMode)return;
+      const starterElapsed=Math.max(0,Number(timer.totalSeconds||0)-Number(timer.remainingSeconds||0));
+      const remaining=Math.max(60,Number(timer.plannedMinutes||timer.minutes||1)*60-starterElapsed);
+      timer.minutes=Number(timer.plannedMinutes||timer.minutes||1);timer.totalSeconds=remaining;timer.remainingSeconds=remaining;timer.starterMode=false;timer.running=true;timer.updatedAt=Date.now();persist();renderTimer();startTimerTicker();
+    }
+    function focusSecondaryAction(){if(state.activeTimer?.starterMode)continueFullBlock();else finishTimerSession()}
     function finishTimerSession(){if(!state.activeTimer)return;const key=state.activeTimer.key;if(!state.completedSessions.has(key))toggleSession(key);state.activeTimer=null;persist();closeFocus();showToast("Focus block completed")}
-    function closeFocus(){clearInterval(state.timerTicker);$("focusOverlay").classList.add("hidden");document.body.style.overflow="";persistLocal(true)}
+    function closeFocus(){
+      clearInterval(state.timerTicker);
+      if(state.activeTimer){restoreTimerElapsed();state.activeTimer.running=false;state.activeTimer.updatedAt=Date.now();state.todaySuggestionKey=state.activeTimer.key}
+      $("focusOverlay").classList.add("hidden");document.body.style.overflow="";persistLocal(true);renderToday();
+    }
     function ensureAudio(){if(!state.audioContext)state.audioContext=new (window.AudioContext||window.webkitAudioContext)();return state.audioContext}
     function playTimerSound(){if(state.settings.timerSound==="none")return;try{const ctx=ensureAudio();const gain=ctx.createGain(),osc=ctx.createOscillator();osc.connect(gain);gain.connect(ctx.destination);osc.frequency.value=state.settings.timerSound==="bell"?720:520;gain.gain.setValueAtTime(.0001,ctx.currentTime);gain.gain.exponentialRampToValueAtTime(.18,ctx.currentTime+.02);gain.gain.exponentialRampToValueAtTime(.0001,ctx.currentTime+.75);osc.start();osc.stop(ctx.currentTime+.8)}catch(error){console.warn(error)}}
 
@@ -1539,15 +1784,15 @@
 
     function handleAction(event){
       const target=event.target.closest("[data-action]");if(!target)return;const action=target.dataset.action;
-      if(action==="add")openTaskModal();if(action==="start")startFocus(target.dataset.key);if(action==="complete")toggleSession(target.dataset.key);if(action==="move")openMove(target.dataset.key);if(action==="edit")openTaskModal(target.dataset.id);if(action==="delete")deleteTask(target.dataset.id);if(action==="toggle-task")toggleTask(target.dataset.id);if(action==="delete-unavailable")deleteUnavailable(target.dataset.id);if(action==="toggle-unavailable")toggleBlockUnavailable(target.dataset.date,target.dataset.block);
+      if(action==="add")openTaskModal();if(action==="start")startFocus(target.dataset.key);if(action==="start-short")startFocus(target.dataset.key,5);if(action==="resume-timer")resumeTimer();if(action==="something-else")doSomethingElse(target.dataset.key);if(action==="complete")toggleSession(target.dataset.key);if(action==="move")openMove(target.dataset.key);if(action==="edit")openTaskModal(target.dataset.id);if(action==="delete")deleteTask(target.dataset.id);if(action==="toggle-task")toggleTask(target.dataset.id);if(action==="delete-unavailable")deleteUnavailable(target.dataset.id);if(action==="toggle-unavailable")toggleBlockUnavailable(target.dataset.date,target.dataset.block);
     }
 
     function setCloudStatus(message){$("cloudStatus").textContent=message}
-    function hasMeaningfulLocalState(){return Boolean(state.tasks.length||state.completedSessions.size||Object.keys(state.manualMoves).length)}
-    function serializeCloudState(){return {schemaVersion:2,tasks:state.tasks,settings:state.settings,completedPlanKeys:[...state.completedSessions],manualMoves:state.manualMoves,activeTimer:state.activeTimer,clientUpdatedAt:state.localRevisionAt||Date.now()}}
+    function hasMeaningfulLocalState(){return Boolean(state.tasks.length||state.completedSessions.size||Object.keys(state.manualMoves).length||Object.keys(state.autoPlacements).length)}
+    function serializeCloudState(){return {schemaVersion:2,tasks:state.tasks,settings:state.settings,completedPlanKeys:[...state.completedSessions],manualMoves:state.manualMoves,autoPlacements:state.autoPlacements,activeTimer:state.activeTimer,clientUpdatedAt:state.localRevisionAt||Date.now()}}
     function applyCloudState(data){
       if(!data||typeof data!=="object")return;state.applyingCloudState=true;
-      try{const cloudSettings=mergeSettings(data.settings||{});state.settings=cloudSettings;state.tasks=(Array.isArray(data.tasks)?data.tasks:[]).map(task=>normalizeTask(task,data.settings||{}));state.completedSessions=new Set(Array.isArray(data.completedPlanKeys)?data.completedPlanKeys:[]);state.manualMoves=data.manualMoves&&typeof data.manualMoves==="object"?data.manualMoves:{};state.activeTimer=data.activeTimer||null;state.localRevisionAt=Number(data.clientUpdatedAt)||Date.now();storageSet(CLOUD_LOCAL_REVISION_KEY,String(state.localRevisionAt));restoreTimerElapsed();persistLocal(false);renderAll()}finally{state.applyingCloudState=false}
+      try{const cloudSettings=mergeSettings(data.settings||{});state.settings=cloudSettings;state.tasks=(Array.isArray(data.tasks)?data.tasks:[]).map(task=>normalizeTask(task,data.settings||{}));state.completedSessions=new Set(Array.isArray(data.completedPlanKeys)?data.completedPlanKeys:[]);state.manualMoves=data.manualMoves&&typeof data.manualMoves==="object"?data.manualMoves:{};state.autoPlacements=data.autoPlacements&&typeof data.autoPlacements==="object"?data.autoPlacements:{};state.activeTimer=data.activeTimer||null;state.localRevisionAt=Number(data.clientUpdatedAt)||Date.now();storageSet(CLOUD_LOCAL_REVISION_KEY,String(state.localRevisionAt));restoreTimerElapsed();if(state.activeTimer){state.activeTimer.running=false;state.activeTimer.updatedAt=Date.now();state.todaySuggestionKey=state.activeTimer.key}persistLocal(false);renderAll()}finally{state.applyingCloudState=false}
     }
     function cloudDoc(uidValue){return state.firebaseFunctions.doc(state.firebaseDb,"taskItUpUsers",uidValue,"data","appState")}
     async function saveCloudNow(){
@@ -1598,14 +1843,14 @@
       $("closeAdjustModal").addEventListener("click",closeAdjust);$("adjustBackdrop").addEventListener("click",closeAdjust);$("lighterTodayChoice").addEventListener("click",makeTodayLighter);$("balanceChoice").addEventListener("click",balanceWeek);$("blockTodayChoice").addEventListener("click",blockRestOfToday);
       $("closeMoveModal").addEventListener("click",closeMove);$("moveBackdrop").addEventListener("click",closeMove);$("confirmMoveButton").addEventListener("click",confirmMove);
       $("closeUnavailableModal").addEventListener("click",closeUnavailableModal);$("unavailableBackdrop").addEventListener("click",closeUnavailableModal);$("confirmUnavailableButton").addEventListener("click",addUnavailableFromPlan);document.querySelectorAll("[data-unavailable-mode]").forEach(button=>button.addEventListener("click",()=>setUnavailableMode(button.dataset.unavailableMode)));
-      $("pauseTimerButton").addEventListener("click",toggleTimer);$("resetTimerButton").addEventListener("click",resetTimer);$("finishSessionButton").addEventListener("click",finishTimerSession);$("closeFocusButton").addEventListener("click",closeFocus);
+      $("pauseTimerButton").addEventListener("click",toggleTimer);$("resetTimerButton").addEventListener("click",resetTimer);$("finishSessionButton").addEventListener("click",focusSecondaryAction);$("closeFocusButton").addEventListener("click",closeFocus);
 
       $("settingsButton").addEventListener("click",openSettings);$("closeSettingsButton").addEventListener("click",closeSettings);$("settingsBackdrop").addEventListener("click",closeSettings);["morningStart","morningEnd","afternoonStart","afternoonEnd","eveningStart","eveningEnd","highEnergyBlock","timerSound"].forEach(id=>$(id).addEventListener("change",saveAvailability));$("addUnavailableButton").addEventListener("click",addUnavailable);
-      $("clearAllButton").addEventListener("click",()=>{if(!confirm("Delete all tasks and plan progress?"))return;state.tasks=[];state.completedSessions.clear();state.manualMoves={};state.activeTimer=null;persist();renderAll();closeSettings();showToast("All tasks cleared")});
+      $("clearAllButton").addEventListener("click",()=>{if(!confirm("Delete all tasks and plan progress?"))return;state.tasks=[];state.completedSessions.clear();state.manualMoves={};state.autoPlacements={};state.activeTimer=null;persist();renderAll();closeSettings();showToast("All tasks cleared")});
       document.addEventListener("keydown",event=>{if(event.key!=="Escape")return;if(!$("taskModal").classList.contains("hidden"))closeTaskModal();else if(!$("moveModal").classList.contains("hidden"))closeMove();else if(!$("unavailableModal").classList.contains("hidden"))closeUnavailableModal();else if(!$("adjustModal").classList.contains("hidden"))closeAdjust();else if($("settingsDrawer").classList.contains("open"))closeSettings()});
     }
 
-    function boot(){loadLocal();bindEvents();renderAll();if(state.activeTimer){renderTimer();$("focusOverlay").classList.remove("hidden");document.body.style.overflow="hidden";if(state.activeTimer.running)startTimerTicker()}initializeFirebase();setInterval(()=>{renderHeader();buildPlan();renderToday();renderPlan();renderTasks()},60000)}
+    function boot(){loadLocal();if(state.activeTimer){state.activeTimer.running=false;state.activeTimer.updatedAt=Date.now();state.todaySuggestionKey=state.activeTimer.key;persistLocal(false)}bindEvents();switchView("todayView");renderAll();$("focusOverlay").classList.add("hidden");document.body.style.overflow="";initializeFirebase();setInterval(()=>{renderHeader();buildPlan();renderToday();renderPlan();renderTasks()},60000)}
     boot();
   </script>
 </body>
