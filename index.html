@@ -694,14 +694,15 @@
       font-weight:400!important;
     }
 
-    .today-hero{position:relative}
+    .today-hero{position:relative;overflow:visible}
     .home-leaf{
-      position:absolute;right:2px;top:-4px;width:74px;height:74px;
-      color:var(--sage);opacity:.72;pointer-events:none;
-      transform:rotate(5deg);
+      position:absolute;right:18px;top:10px;width:46px;height:46px;
+      color:#9db1a7;opacity:.92;pointer-events:none;
+      transform:rotate(-7deg);
     }
-    .home-leaf svg{display:block;width:100%;height:100%}
-    .home-leaf path{vector-effect:non-scaling-stroke}
+    .home-leaf svg{display:block;width:100%;height:100%;overflow:visible}
+    .home-leaf .leaf-stem{fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke}
+    .home-leaf .leaf-fill{fill:rgba(157,177,167,.12);stroke:currentColor;stroke-width:1.4;vector-effect:non-scaling-stroke}
 
     .suggestion-nudge{
       max-width:590px;margin:18px 0 0;padding:14px 16px;border-radius:16px;
@@ -718,9 +719,35 @@
     }
     .resume-note::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--sage)}
 
+
+    /* Tasks view: make rows feel clean, compact, and aligned. */
+    #tasksView .toolbar h2{font-size:clamp(2.6rem,7vw,4.1rem)}
+    #tasksView .toolbar{margin-bottom:24px}
+    .task-list{display:grid;gap:14px}
+    .task-card{
+      display:grid;grid-template-columns:minmax(0,1fr) auto;gap:18px;align-items:center;
+      padding:18px 18px 16px 20px!important;border:1px solid var(--line)!important;
+      border-radius:18px!important;background:rgba(255,255,255,.78)!important;
+      box-shadow:none!important;
+    }
+    .task-card::before{left:12px;top:16px;bottom:16px;width:3px}
+    .task-card-main{min-width:0;padding-left:10px}
+    .task-card h3{margin:0;font-size:1.08rem;line-height:1.34}
+    .task-card-meta{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
+    .task-card .pill{background:rgba(255,255,255,.62)}
+    .task-progress{margin-top:12px;max-width:560px}
+    .task-progress-copy{display:flex;justify-content:space-between;gap:12px}
+    .task-progress-track{height:6px}
+    .task-card-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex:0 0 auto}
+    .task-card-actions .round-action{min-width:38px}
+
     @media(max-width:720px){
-      .home-leaf{width:58px;height:58px;right:-2px;top:2px;opacity:.58}
+      .home-leaf{width:38px;height:38px;right:10px;top:12px;opacity:.85}
       .suggestion-nudge{font-size:.86rem}
+      .task-card{grid-template-columns:1fr;padding:16px 16px 15px 18px!important}
+      .task-card-main{padding-left:8px}
+      .task-progress{max-width:none}
+      .task-card-actions{justify-content:flex-start;padding-left:8px}
     }
   </style>
 
@@ -757,11 +784,12 @@
             <div class="panel today-hero">
               <div class="eyebrow">Today</div>
               <div class="home-leaf" aria-hidden="true">
-                <svg viewBox="0 0 90 90" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M18 69C41 61 55 44 69 19" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
-                  <path d="M40 54C27 53 18 46 16 34C28 33 39 39 40 54Z" fill="currentColor" fill-opacity=".18" stroke="currentColor" stroke-width="1.7"/>
-                  <path d="M53 41C49 28 55 17 67 12C72 25 67 37 53 41Z" fill="currentColor" fill-opacity=".18" stroke="currentColor" stroke-width="1.7"/>
-                  <path d="M29 63C22 58 17 58 11 60" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+                  <path class="leaf-stem" d="M10 47c11-2 20-9 30-22"/>
+                  <path class="leaf-fill" d="M27 38c-7 0-12-5-13-12 7-1 12 4 13 12Z"/>
+                  <path class="leaf-stem" d="M22 28c2 2 4 5 5 10"/>
+                  <path class="leaf-fill" d="M37 24c1-8 7-13 15-14 0 8-5 14-13 16Z"/>
+                  <path class="leaf-stem" d="M45 13c-2 3-5 6-8 11"/>
                 </svg>
               </div>
               <h2 id="todayHeadline">Let’s make today manageable.</h2>
@@ -1590,7 +1618,7 @@
       if(!shown.length){$("taskList").innerHTML=`<div class="empty-state"><h3>${state.taskFilter==="completed"?"No completed tasks yet":"No tasks here"}</h3><p>${state.taskFilter==="completed"?"Completed tasks will appear here.":"Add a task and Task-it-up will build the plan."}</p>${state.taskFilter!=="completed"?`<button class="btn btn-primary" data-action="add">Add a task</button>`:""}</div>`;return}
       $("taskList").innerHTML=shown.map(task=>{
         const progress=state.taskProgress.get(task.id)||{done:0,total:0};const percent=task.completed?100:progress.total?Math.round(progress.done/progress.total*100):0;
-        return `<div class="task-card ${task.completed?"completed":""}"><div><h3>${escapeHtml(task.name)}</h3><div class="task-card-meta"><span class="pill">${formatMinutes(task.estimateMinutes)}</span>${task.deadline?`<span class="pill">Due ${formatDate(parseDate(task.deadline),{month:"short",day:"numeric"})}</span>`:`<span class="pill">Flexible</span>`}${task.category?`<span class="pill">${escapeHtml(task.category)}</span>`:""}${task.recurring?`<span class="pill">Repeats ${task.frequency}</span>`:""}</div><div class="task-progress"><div class="task-progress-copy"><span>${task.completed?"Complete":`${progress.done} of ${progress.total} focus blocks`}</span><span>${percent}%</span></div><div class="task-progress-track"><div class="task-progress-fill" style="width:${percent}%"></div></div></div></div><div class="task-card-actions"><button class="round-action" data-action="toggle-task" data-id="${task.id}" title="${task.completed?"Reopen":"Complete task"}">${task.completed?"↺":"✓"}</button><button class="round-action" data-action="edit" data-id="${task.id}" title="Edit">✎</button><button class="round-action" data-action="delete" data-id="${task.id}" title="Delete">×</button></div></div>`;
+        return `<div class="task-card ${task.completed?"completed":""}"><div class="task-card-main"><h3>${escapeHtml(task.name)}</h3><div class="task-card-meta"><span class="pill">${formatMinutes(task.estimateMinutes)}</span>${task.deadline?`<span class="pill">Due ${formatDate(parseDate(task.deadline),{month:"short",day:"numeric"})}</span>`:`<span class="pill">Flexible</span>`}${task.category?`<span class="pill">${escapeHtml(task.category)}</span>`:""}${task.recurring?`<span class="pill">Repeats ${task.frequency}</span>`:""}</div><div class="task-progress"><div class="task-progress-copy"><span>${task.completed?"Complete":`${progress.done} of ${progress.total} focus blocks`}</span><span>${percent}%</span></div><div class="task-progress-track"><div class="task-progress-fill" style="width:${percent}%"></div></div></div></div><div class="task-card-actions"><button class="round-action" data-action="toggle-task" data-id="${task.id}" title="${task.completed?"Reopen":"Complete task"}">${task.completed?"↺":"✓"}</button><button class="round-action" data-action="edit" data-id="${task.id}" title="Edit">✎</button><button class="round-action" data-action="delete" data-id="${task.id}" title="Delete">×</button></div></div>`;
       }).join("");
     }
 
