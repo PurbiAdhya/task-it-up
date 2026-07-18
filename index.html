@@ -696,13 +696,15 @@
 
     .today-hero{position:relative;overflow:visible}
     .home-leaf{
-      position:absolute;right:18px;top:10px;width:46px;height:46px;
-      color:#9db1a7;opacity:.92;pointer-events:none;
-      transform:rotate(-7deg);
+      position:absolute;right:8px;top:0;width:88px;height:88px;
+      opacity:.98;pointer-events:none;transform:rotate(-9deg);
     }
     .home-leaf svg{display:block;width:100%;height:100%;overflow:visible}
-    .home-leaf .leaf-stem{fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke}
-    .home-leaf .leaf-fill{fill:rgba(157,177,167,.12);stroke:currentColor;stroke-width:1.4;vector-effect:non-scaling-stroke}
+    .home-leaf .leaf-base{fill:#89a95a}
+    .home-leaf .leaf-shadow{fill:#7ea04f}
+    .home-leaf .leaf-mid{fill:#759b42}
+    .home-leaf .leaf-vein{fill:none;stroke:#5d8730;stroke-width:2.7;stroke-linecap:round;stroke-linejoin:round;opacity:.9;vector-effect:non-scaling-stroke}
+    .home-leaf .leaf-soft-vein{fill:none;stroke:#6c9540;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;opacity:.72;vector-effect:non-scaling-stroke}
 
     .suggestion-nudge{
       max-width:590px;margin:18px 0 0;padding:14px 16px;border-radius:16px;
@@ -742,7 +744,7 @@
     .task-card-actions .round-action{min-width:38px}
 
     @media(max-width:720px){
-      .home-leaf{width:38px;height:38px;right:10px;top:12px;opacity:.85}
+      .home-leaf{width:68px;height:68px;right:2px;top:8px;opacity:.96}
       .suggestion-nudge{font-size:.86rem}
       .task-card{grid-template-columns:1fr;padding:16px 16px 15px 18px!important}
       .task-card-main{padding-left:8px}
@@ -784,12 +786,15 @@
             <div class="panel today-hero">
               <div class="eyebrow">Today</div>
               <div class="home-leaf" aria-hidden="true">
-                <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
-                  <path class="leaf-stem" d="M10 47c11-2 20-9 30-22"/>
-                  <path class="leaf-fill" d="M27 38c-7 0-12-5-13-12 7-1 12 4 13 12Z"/>
-                  <path class="leaf-stem" d="M22 28c2 2 4 5 5 10"/>
-                  <path class="leaf-fill" d="M37 24c1-8 7-13 15-14 0 8-5 14-13 16Z"/>
-                  <path class="leaf-stem" d="M45 13c-2 3-5 6-8 11"/>
+                <svg viewBox="0 0 96 96" xmlns="http://www.w3.org/2000/svg">
+                  <path class="leaf-base" d="M16 85C10 61 14 40 29 26C46 10 71 8 87 8C88 25 89 50 78 69C68 86 46 89 28 89C23 89 19 88 16 85Z"/>
+                  <path class="leaf-shadow" d="M16 85C23 78 29 72 36 66C45 59 55 52 66 42C74 35 80 27 87 8C88 25 89 50 78 69C68 86 46 89 28 89C23 89 19 88 16 85Z" opacity=".42"/>
+                  <path class="leaf-mid" d="M32 36C28 48 31 59 42 68C50 74 61 78 73 78C59 85 43 86 28 89C23 89 19 88 16 85C11 65 13 47 24 32C26 31 29 32 32 36Z" opacity=".34"/>
+                  <path class="leaf-vein" d="M20 78C30 55 47 43 76 21"/>
+                  <path class="leaf-soft-vein" d="M34 56C27 46 25 37 28 26"/>
+                  <path class="leaf-soft-vein" d="M49 49C47 38 48 29 51 20"/>
+                  <path class="leaf-soft-vein" d="M60 40C65 44 71 49 76 58"/>
+                  <path class="leaf-soft-vein" d="M36 58C48 58 59 64 66 75"/>
                 </svg>
               </div>
               <h2 id="todayHeadline">Let’s make today manageable.</h2>
