@@ -296,6 +296,193 @@
       .focus-actions{display:grid;grid-template-columns:1fr 1fr}.focus-actions .btn-primary{min-width:0;grid-column:1/-1}
     }
   </style>
+
+  <style id="fresh-air-redesign">
+    :root{
+      --bg:#f8faf8;
+      --surface:#ffffff;
+      --surface-soft:#f3f7f5;
+      --ink:#17342e;
+      --muted:#72827e;
+      --line:#e2eae6;
+      --primary:#3f756b;
+      --primary-strong:#315f57;
+      --primary-soft:#e2efeb;
+      --amber:#9a6417;
+      --amber-soft:#fff7e6;
+      --danger:#ad4f4f;
+      --danger-soft:#fff3f2;
+      --success:#3f756b;
+      --shadow:none;
+      --radius:24px;
+    }
+
+    body{
+      background:
+        radial-gradient(circle at 16% -5%,rgba(162,210,197,.17),transparent 30rem),
+        radial-gradient(circle at 92% 8%,rgba(198,220,235,.16),transparent 27rem),
+        var(--bg);
+    }
+
+    .app{width:min(1040px,100%);padding:28px 26px 90px}
+    .topbar{margin:0 0 12px;min-height:52px}
+    .brand{gap:10px}
+    .brand-mark{
+      width:36px;height:36px;border-radius:50%;background:transparent;color:var(--primary);
+      border:1.5px solid #b8cec7;box-shadow:none;font-size:18px
+    }
+    .brand h1{font-size:1.28rem;letter-spacing:-.035em;font-weight:900}
+    .brand-date{display:none}
+    .top-actions{gap:9px}
+    .cloud-copy{display:none}
+    #signInButton,#signOutButton{min-height:38px;padding:7px 10px;background:transparent;border:0;color:#7c8b87;box-shadow:none;font-size:.72rem}
+    .icon-btn{width:42px;height:42px;border-radius:50%;background:rgba(255,255,255,.62);box-shadow:none}
+    .btn{min-height:46px;border-radius:999px;padding:10px 18px;box-shadow:none}
+    .btn:hover{transform:none}
+    .btn-primary{box-shadow:none}
+    #freshAddTaskButton{padding-inline:20px}
+
+    .nav{
+      display:flex;justify-content:flex-start;gap:30px;padding:0;margin:0 0 66px;
+      background:transparent;border:0;border-radius:0;position:static;backdrop-filter:none
+    }
+    .nav-btn{
+      position:relative;min-height:auto;padding:13px 0 11px;border-radius:0;background:transparent;
+      color:#86938f;font-size:.86rem;font-weight:850
+    }
+    .nav-btn.active{background:transparent;color:var(--ink);box-shadow:none}
+    .nav-btn.active::after{
+      content:"";position:absolute;left:0;right:0;bottom:3px;height:2px;border-radius:99px;background:var(--primary)
+    }
+
+    .panel{background:transparent;border:0;border-radius:0;box-shadow:none}
+    .today-grid{display:block;max-width:820px;margin:0 auto}
+    .today-main{display:block}
+    .today-side{display:none!important}
+    .today-hero{padding:0 0 34px;overflow:visible}
+    .today-hero::after{display:none}
+    .eyebrow{font-size:.76rem;letter-spacing:.16em;color:#7b918b}
+    .today-hero h2{
+      max-width:760px;margin:12px 0 14px;font-size:clamp(3rem,8vw,5.7rem);
+      line-height:.97;letter-spacing:-.075em;font-weight:850
+    }
+    .today-summary{max-width:620px;font-size:1.06rem;line-height:1.55;font-weight:650;color:var(--muted)}
+
+    .fit-banner{
+      margin:0 0 34px;padding:15px 17px;border-radius:17px;background:var(--amber-soft);
+      border:1px solid #ecdcae;box-shadow:none
+    }
+    .fit-banner:not(.warning){display:none}
+    .fit-icon{width:27px;height:27px;font-size:.85rem}
+
+    .next-card{
+      padding:38px 0 44px;border-top:1px solid var(--line);border-bottom:1px solid var(--line)
+    }
+    .next-card.empty-card{padding:8px 0 0;border:0}
+    .next-label{font-size:.69rem;letter-spacing:.16em;color:#7b918b}
+    .next-task{max-width:690px;margin:13px 0 8px;font-size:clamp(2.1rem,6vw,4rem);line-height:1.02;letter-spacing:-.065em}
+    .next-meta{margin:17px 0 28px;gap:8px}
+    .pill{padding:6px 10px;background:transparent;border-color:#dbe6e1;color:#73827e;font-weight:750}
+    .next-actions{align-items:center;gap:13px}
+    .next-actions .btn-primary{flex:0 0 auto;min-width:190px}
+    .btn-large{min-height:58px;padding:14px 28px;font-size:1rem}
+    .next-actions .btn-ghost{background:transparent;border-color:transparent;color:var(--muted);padding-inline:8px}
+
+    .empty-next{padding:30px 0 10px;text-align:left}
+    .empty-next .empty-icon{display:none}
+    .empty-next h3{max-width:610px;font-size:clamp(2rem,6vw,3.8rem);line-height:1.04;letter-spacing:-.055em;margin:0 0 14px}
+    .empty-next p{max-width:520px;margin:0 0 28px;font-size:1rem;line-height:1.55}
+
+    .section-panel{padding:42px 0 0}
+    .section-head{margin-bottom:5px}
+    .section-head h3{font-size:.8rem;letter-spacing:.13em;text-transform:uppercase;color:#7c8d88}
+    .section-head span{font-size:.72rem}
+    .session-list{gap:0}
+    .session-row{
+      grid-template-columns:auto minmax(0,1fr) auto;gap:15px;padding:19px 0;
+      border:0;border-bottom:1px solid var(--line);border-radius:0;background:transparent
+    }
+    .session-check{width:38px;height:38px;border-radius:50%;background:transparent;border-color:#cbdad5}
+    .session-title{font-size:1.02rem;font-weight:800}
+    .session-sub{margin-top:5px;font-size:.72rem}
+    .round-action{width:auto;min-width:37px;height:37px;padding:0 11px;border-radius:999px;background:transparent}
+    .empty-state{border:0;background:transparent;padding:36px 0;text-align:left}
+    .empty-state h3{font-size:1.45rem}.empty-state p{max-width:520px}
+
+    .plan-panel,.tasks-panel{max-width:900px;margin:0 auto;padding:0}
+    .toolbar{margin-bottom:28px;align-items:flex-end}
+    .toolbar h2{font-size:clamp(2.4rem,6vw,4rem);line-height:1;letter-spacing:-.06em}
+    .toolbar p{margin-top:10px;font-size:.9rem}
+    .week-nav{max-width:500px;margin:0 0 32px;padding:5px;background:rgba(255,255,255,.55);border-color:var(--line)}
+    .week-grid{display:grid;grid-template-columns:1fr;gap:28px;overflow:visible}
+    .day-card{border:0;border-top:1px solid var(--line);border-radius:0;background:transparent;overflow:visible}
+    .day-card.today{border-color:#8eb7ad;box-shadow:none}
+    .day-head{padding:20px 0 13px;background:transparent;border:0}
+    .day-head strong{font-size:1.15rem}.day-head span{font-size:.74rem}
+    .load-track{max-width:300px}
+    .day-body{padding:0;display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+    .block{border:1px solid var(--line);border-radius:16px;background:rgba(255,255,255,.52)}
+    .block-head,.block-head.morning,.block-head.afternoon,.block-head.evening{background:transparent}
+    .plan-item{border:0;border-top:1px solid var(--line);border-left:0;border-radius:0;background:transparent;padding:11px 3px}
+    .plan-item:first-child{border-top:0}
+
+    .task-filter{display:inline-flex;width:auto;background:rgba(255,255,255,.55);margin-bottom:26px}
+    .task-list{gap:0}
+    .task-card{padding:22px 0;border:0;border-bottom:1px solid var(--line);border-radius:0;background:transparent}
+    .task-card h3{font-size:1.12rem}
+
+    .backdrop{background:rgba(21,45,39,.24);backdrop-filter:blur(12px)}
+    .modal{width:min(590px,calc(100vw - 26px));border:0;border-radius:30px;box-shadow:0 30px 90px rgba(33,65,57,.18)}
+    .modal-head{padding:20px 24px;border:0;background:rgba(255,255,255,.94)}
+    .modal-head h2{font-size:.9rem;color:var(--muted);text-transform:uppercase;letter-spacing:.12em}
+    .modal-close{border:0;background:var(--surface-soft);border-radius:50%}
+    .modal-body{padding:4px 28px 30px}
+    .wizard-progress{grid-template-columns:repeat(2,1fr);gap:8px;margin:0 0 34px}
+    .wizard-dot{height:3px;background:#edf1ef}.wizard-dot.active{background:#8eb7ad}
+    .wizard-step h3{margin:0 0 25px;font-size:clamp(2rem,6vw,3rem);line-height:1.02;letter-spacing:-.055em}
+    .field label{font-size:.74rem;color:#74847f}
+    .field input,.field select,.field textarea{min-height:57px;border-radius:15px;background:#f8faf9;border-color:#dfe8e4;font-size:1rem}
+    #taskName{min-height:66px;font-size:1.12rem;padding-inline:16px}
+    .choice-grid{gap:10px}
+    .choice{min-height:64px;border-radius:16px;background:#fbfcfb;font-size:.9rem}
+    .choice.selected{background:var(--primary-soft);box-shadow:none}
+    .feeling-grid{grid-template-columns:1fr 1fr}
+    .feeling{min-height:66px;border-radius:16px;background:#fbfcfb}
+    .feeling span{display:none}
+    .split-choice{margin-top:10px}
+    .more-toggle{margin-top:18px;padding:10px 0}
+    .wizard-actions{margin-top:28px}.wizard-actions .btn{min-height:54px}
+
+    .focus-overlay{background:#f4f8f6}
+    .timer-ring{box-shadow:none;background:conic-gradient(var(--primary) var(--timer-progress,0deg),#e0e9e5 0)}
+    .timer-ring::before{background:#f9fbfa}
+
+    .drawer{box-shadow:-18px 0 70px rgba(30,58,51,.12);padding:28px}
+    .settings-card{background:transparent;border:0;border-bottom:1px solid var(--line);border-radius:0;padding:0 0 24px;margin:0 0 24px}
+
+    @media(max-width:720px){
+      .app{padding:18px 18px 104px}
+      .topbar{margin-bottom:4px}
+      .cloud-copy{display:none}
+      #signInButton,#signOutButton{display:none!important}
+      #freshAddTaskButton{min-height:42px;padding:8px 15px;font-size:.78rem}
+      .nav{position:fixed;left:12px;right:12px;bottom:12px;top:auto;z-index:22;margin:0;padding:6px 18px;
+        justify-content:space-around;gap:8px;background:rgba(255,255,255,.88);border:1px solid var(--line);border-radius:999px;backdrop-filter:blur(18px)}
+      .nav-btn{padding:10px 9px}.nav-btn.active::after{display:none}.nav-btn.active{color:var(--primary)}
+      .today-hero{padding-top:45px}
+      .today-hero h2{font-size:clamp(3rem,15vw,4.7rem)}
+      .next-card{padding:30px 0 36px}
+      .next-actions{display:grid}.next-actions .btn-primary{width:100%;min-width:0}.next-actions .btn-ghost{justify-self:start}
+      .session-row{grid-template-columns:auto minmax(0,1fr)}.session-actions{grid-column:2}
+      .day-body{grid-template-columns:1fr}
+      .toolbar{align-items:flex-start}.toolbar-actions{width:100%}.toolbar-actions .btn{flex:1}
+      .modal{top:auto;bottom:0;transform:translateX(-50%);width:100%;max-height:92vh;border-radius:28px 28px 0 0}
+      .modal-body{padding:4px 22px 28px}
+      .choice-grid,.split-choice,.form-row{grid-template-columns:1fr 1fr}
+      .feeling-grid{grid-template-columns:1fr}
+    }
+  </style>
+
 </head>
 <body>
   <div class="app">
@@ -308,6 +495,7 @@
         </div>
       </div>
       <div class="top-actions">
+        <button class="btn btn-primary" id="freshAddTaskButton" type="button">＋ Add task</button>
         <span class="cloud-copy" id="cloudStatus">Saved on this device</span>
         <button class="btn btn-soft" id="signInButton" type="button" disabled>Connecting…</button>
         <button class="btn btn-ghost hidden" id="signOutButton" type="button">Sign out</button>
@@ -408,25 +596,23 @@
   <div class="modal hidden" id="taskModal" role="dialog" aria-modal="true" aria-labelledby="taskModalTitle">
     <div class="modal-head"><h2 id="taskModalTitle">Add a task</h2><button class="modal-close" id="closeTaskModal" type="button" aria-label="Close">×</button></div>
     <div class="modal-body">
-      <div class="wizard-progress" id="wizardProgress"><div class="wizard-dot active"></div><div class="wizard-dot"></div><div class="wizard-dot"></div><div class="wizard-dot"></div></div>
+      <div class="wizard-progress" id="wizardProgress"><div class="wizard-dot active"></div><div class="wizard-dot"></div></div>
       <form id="taskForm">
         <input type="hidden" id="editingTaskId" />
         <section class="wizard-step active" data-step="1">
-          <h3>What do you need to finish?</h3>
-          <div class="field"><label for="taskName">Task</label><input id="taskName" maxlength="120" autocomplete="off" placeholder="e.g., Review the paper" required /></div>
-        </section>
-        <section class="wizard-step" data-step="2">
-          <h3>When does it need to be done?</h3>
+          <h3>What needs your attention?</h3>
+          <div class="field"><label for="taskName">Task</label><input id="taskName" maxlength="120" autocomplete="off" placeholder="Review the paper" required /></div>
+          <div class="field" style="margin-top:24px"><label>When should it be finished?</label></div>
           <div class="choice-grid" id="deadlineChoices">
             <button class="choice" type="button" data-deadline-choice="today">Today</button>
             <button class="choice" type="button" data-deadline-choice="tomorrow">Tomorrow</button>
-            <button class="choice" type="button" data-deadline-choice="week">Within 7 days</button>
-            <button class="choice selected" type="button" data-deadline-choice="none">No deadline<small>Fit it in when there is room</small></button>
+            <button class="choice" type="button" data-deadline-choice="week">This week</button>
+            <button class="choice selected" type="button" data-deadline-choice="none">No deadline</button>
           </div>
-          <div class="field date-custom"><label for="taskDeadline">Or choose a date</label><input id="taskDeadline" type="date" /></div>
+          <div class="field date-custom"><label for="taskDeadline">Choose another date</label><input id="taskDeadline" type="date" /></div>
         </section>
-        <section class="wizard-step" data-step="3">
-          <h3>About how much work is it?</h3>
+        <section class="wizard-step" data-step="2">
+          <h3>How much time will it take?</h3>
           <div class="choice-grid" id="estimateChoices">
             <button class="choice" type="button" data-estimate="15">15 minutes</button>
             <button class="choice selected" type="button" data-estimate="30">30 minutes</button>
@@ -434,24 +620,25 @@
             <button class="choice" type="button" data-estimate="120">2 hours</button>
           </div>
           <div class="field time-custom"><label for="customEstimate">Or enter minutes</label><input id="customEstimate" type="number" min="5" max="2880" step="5" value="30" /></div>
-        </section>
-        <section class="wizard-step" data-step="4">
-          <h3>How does this task feel?</h3>
+          <div class="field" style="margin-top:24px"><label>Starting this feels…</label></div>
           <div class="feeling-grid" id="feelingChoices">
-            <button class="feeling" type="button" data-feeling="easy"><span>○</span>Easy to start</button>
-            <button class="feeling selected" type="button" data-feeling="neutral"><span>◐</span>Okay</button>
-            <button class="feeling" type="button" data-feeling="difficult"><span>△</span>I’m avoiding it</button>
+            <button class="feeling selected" type="button" data-feeling="neutral">Straightforward</button>
+            <button class="feeling" type="button" data-feeling="difficult">Hard to start</button>
           </div>
-          <div class="split-choice" id="splitChoices">
+          <div class="hidden" id="splitChoices">
             <button class="choice selected" type="button" data-split="split">Break it into focus blocks</button>
             <button class="choice" type="button" data-split="together">Keep it together</button>
           </div>
-          <button class="more-toggle" id="moreOptionsButton" type="button">＋ More options</button>
+          <button class="more-toggle" id="moreOptionsButton" type="button">＋ Optional details</button>
           <div class="more-options hidden" id="moreOptions">
-            <div class="field"><label for="taskCategory">Category</label><input id="taskCategory" maxlength="40" placeholder="e.g., Teaching, Home, Research" /></div>
-            <div class="field"><label for="taskNotes">Notes</label><textarea id="taskNotes" placeholder="Optional details"></textarea></div>
+            <div class="field"><label for="taskCategory">Area</label><input id="taskCategory" maxlength="40" placeholder="Teaching, Home, Research…" /></div>
+            <div class="field"><label for="taskNotes">Notes</label><textarea id="taskNotes" placeholder="Anything useful to remember"></textarea></div>
             <div class="switch-row">
-              <div class="switch-copy"><strong>Recurring task</strong><span>Repeat this task automatically.</span></div>
+              <div class="switch-copy"><strong>Keep this work together</strong><span>Do it in one longer session instead of smaller blocks.</span></div>
+              <label class="switch"><input id="keepTogetherSwitch" type="checkbox" /><span class="slider"></span></label>
+            </div>
+            <div class="switch-row">
+              <div class="switch-copy"><strong>Repeat this task</strong><span>Create it again automatically.</span></div>
               <label class="switch"><input id="taskRecurring" type="checkbox" /><span class="slider"></span></label>
             </div>
             <div class="hidden" id="recurringFields">
@@ -465,8 +652,8 @@
         </section>
         <div class="wizard-actions">
           <button class="btn btn-ghost hidden" id="wizardBackButton" type="button">Back</button>
-          <button class="btn btn-primary" id="wizardNextButton" type="button">Next</button>
-          <button class="btn btn-primary hidden" id="saveTaskButton" type="submit">Add task</button>
+          <button class="btn btn-primary" id="wizardNextButton" type="button">Continue</button>
+          <button class="btn btn-primary hidden" id="saveTaskButton" type="submit">Add to my plan</button>
         </div>
       </form>
     </div>
@@ -794,33 +981,33 @@
     function renderToday(){
       const remaining=incompleteTodayItems();const completed=todayItems().filter(item=>isSessionDone(item.key));
       const minutes=remaining.reduce((sum,item)=>sum+item.minutes,0);const weekRemaining=currentWeekDays().flatMap(day=>day.items).filter(item=>!isSessionDone(item.key)).reduce((sum,item)=>sum+item.minutes,0);
-      $("todayHeadline").textContent=remaining.length?"Here is your next step.":state.tasks.some(task=>!task.completed)?"You are clear for today.":"Let’s make today manageable.";
-      $("todaySummary").textContent=remaining.length?`${formatMinutes(minutes)} across ${remaining.length} focus ${remaining.length===1?"block":"blocks"}.`:state.tasks.some(task=>!task.completed)?"Your remaining work is planned for later.":"Add what you need to finish. The app will build the plan.";
+      const hasActiveTasks=state.tasks.some(task=>!task.completed);
+      const nextFuture=state.masterPlan.slice(1).flatMap(day=>day.items.map(item=>({day,item}))).find(entry=>!isSessionDone(entry.item.key));
+      $("todayHeadline").textContent=remaining.length?"Just this, for now.":hasActiveTasks?"You’re done for today.":"What matters now?";
+      $("todaySummary").textContent=remaining.length?`${formatMinutes(minutes)} is planned. Everything else can wait.`:hasActiveTasks?(nextFuture?`Next: ${nextFuture.item.task.name} on ${formatDate(nextFuture.day.date,{weekday:"long"})}.`:"Your remaining work is already placed later."):"Add it once. We’ll break it down and make room for it.";
       $("todayMinutesStat").textContent=formatMinutes(minutes);$("todayBlocksStat").textContent=remaining.length;$("weekMinutesStat").textContent=formatMinutes(weekRemaining);$("doneStat").textContent=completed.length;
 
       const unscheduledMinutes=state.unscheduled.reduce((sum,item)=>sum+item.minutes,0);const banner=$("fitBanner");
-      banner.classList.toggle("warning",unscheduledMinutes>0);$("fitIcon").textContent=unscheduledMinutes?"!":"✓";
-      $("fitTitle").textContent=unscheduledMinutes?`${formatMinutes(unscheduledMinutes)} does not fit before its deadline.`:"Everything fits. You have a workable plan.";
-      $("fitDetail").textContent=unscheduledMinutes?"Adjust availability or move flexible work.":"The plan updates when tasks or availability change.";
+      banner.classList.toggle("warning",unscheduledMinutes>0);banner.classList.toggle("hidden",!unscheduledMinutes);$("fitIcon").textContent="!";
+      $("fitTitle").textContent=unscheduledMinutes?`${formatMinutes(unscheduledMinutes)} needs more room before its deadline.`:"";
+      $("fitDetail").textContent=unscheduledMinutes?"Open the plan to make a small adjustment.":"";
       $("fixPlanButton").classList.toggle("hidden",!unscheduledMinutes);
 
-      const next=remaining[0];
+      const next=remaining[0];const nextCard=$("nextCard");nextCard.classList.toggle("empty-card",!next);
       if(next){
-        $("nextCard").innerHTML=`<div class="next-label">Up next</div><h3 class="next-task">${escapeHtml(next.task.name)}</h3><div class="next-meta"><span class="pill">${next.label}</span><span class="pill">${formatMinutes(next.minutes)}</span><span class="pill">${BLOCK_LABELS[next.block]}</span>${next.task.category?`<span class="pill">${escapeHtml(next.task.category)}</span>`:""}</div><div class="next-actions"><button class="btn btn-primary btn-large" data-action="start" data-key="${next.key}">Start focus</button><button class="btn btn-ghost" data-action="move" data-key="${next.key}">I can’t do this now</button></div>`;
-      }else if(!state.tasks.some(task=>!task.completed)){
-        $("nextCard").innerHTML=`<div class="empty-next"><div class="empty-icon">✓</div><h3>Add your first task</h3><p>Tell Task-it-up what needs to be finished. It will divide the work and show you what to do today.</p><button class="btn btn-primary btn-large" data-action="add">Add a task</button></div>`;
+        nextCard.innerHTML=`<div class="next-label">Now</div><h3 class="next-task">${escapeHtml(next.task.name)}</h3><div class="next-meta"><span class="pill">${formatMinutes(next.minutes)}</span><span class="pill">${next.label}</span><span class="pill">${BLOCK_LABELS[next.block]}</span></div><div class="next-actions"><button class="btn btn-primary btn-large" data-action="start" data-key="${next.key}">Start</button><button class="btn btn-ghost" data-action="move" data-key="${next.key}">Not now</button></div>`;
       }else{
-        const nextFuture=state.masterPlan.slice(1).flatMap(day=>day.items.map(item=>({day,item}))).find(entry=>!isSessionDone(entry.item.key));
-        $("nextCard").innerHTML=`<div class="empty-next"><div class="empty-icon">✓</div><h3>Today is handled</h3><p>${nextFuture?`Next: ${escapeHtml(nextFuture.item.task.name)} on ${formatDate(nextFuture.day.date,{weekday:"long"})}.`:"No more work is currently scheduled."}</p><button class="btn btn-soft" data-action="add">Add another task</button></div>`;
+        nextCard.innerHTML=`<button class="btn ${hasActiveTasks?"btn-soft":"btn-primary"} btn-large" data-action="add">${hasActiveTasks?"Add another task":"Add something"}</button>`;
       }
 
-      const later=remaining.slice(1);$("laterCount").textContent=later.length?`${later.length} remaining`:"Nothing else";
-      $("todaySessionList").innerHTML=later.length?later.map(sessionRowHtml).join(""):`<div class="empty-state" style="padding:28px 16px"><h3>You can focus on one thing.</h3><p>Nothing else is waiting behind it today.</p></div>`;
+      const later=remaining.slice(1);$("laterCount").textContent=later.length?`${later.length} more`:"";
+      const laterPanel=$("todaySessionList").closest(".section-panel");laterPanel.classList.toggle("hidden",later.length===0);
+      $("todaySessionList").innerHTML=later.map(sessionRowHtml).join("");
     }
 
     function sessionRowHtml(item){
       const done=isSessionDone(item.key);
-      return `<div class="session-row ${done?"done":""}"><button class="session-check" data-action="complete" data-key="${item.key}" aria-label="${done?"Mark not done":"Mark done"}">${done?"✓":""}</button><div><div class="session-title">${escapeHtml(item.task.name)}</div><div class="session-sub">${item.label} · ${formatMinutes(item.minutes)} · ${BLOCK_LABELS[item.block]}${item.task.category?` · ${escapeHtml(item.task.category)}`:""}</div></div><div class="session-actions"><button class="round-action" data-action="start" data-key="${item.key}" title="Start focus">▶</button><button class="round-action" data-action="move" data-key="${item.key}" title="Move">↗</button></div></div>`;
+      return `<div class="session-row ${done?"done":""}"><button class="session-check" data-action="complete" data-key="${item.key}" aria-label="${done?"Mark not done":"Mark done"}">${done?"✓":""}</button><div><div class="session-title">${escapeHtml(item.task.name)}</div><div class="session-sub">${item.label} · ${formatMinutes(item.minutes)} · ${BLOCK_LABELS[item.block]}${item.task.category?` · ${escapeHtml(item.task.category)}`:""}</div></div><div class="session-actions"><button class="round-action" data-action="start" data-key="${item.key}" title="Start focus">Start</button><button class="round-action" data-action="move" data-key="${item.key}" title="Move">···</button></div></div>`;
     }
 
     function planItemHtml(item){
@@ -868,19 +1055,19 @@
     function switchView(viewId){document.querySelectorAll(".view").forEach(view=>view.classList.toggle("active",view.id===viewId));document.querySelectorAll(".nav-btn").forEach(btn=>btn.classList.toggle("active",btn.dataset.view===viewId));window.scrollTo({top:0,behavior:"smooth"})}
 
     function setWizardStep(step){
-      state.wizardStep=clamp(step,1,4);document.querySelectorAll(".wizard-step").forEach(section=>section.classList.toggle("active",Number(section.dataset.step)===state.wizardStep));document.querySelectorAll(".wizard-dot").forEach((dot,index)=>dot.classList.toggle("active",index<state.wizardStep));
-      $("wizardBackButton").classList.toggle("hidden",state.wizardStep===1);$("wizardNextButton").classList.toggle("hidden",state.wizardStep===4);$("saveTaskButton").classList.toggle("hidden",state.wizardStep!==4);
+      state.wizardStep=clamp(step,1,2);document.querySelectorAll(".wizard-step").forEach(section=>section.classList.toggle("active",Number(section.dataset.step)===state.wizardStep));document.querySelectorAll(".wizard-dot").forEach((dot,index)=>dot.classList.toggle("active",index<state.wizardStep));
+      $("wizardBackButton").classList.toggle("hidden",state.wizardStep===1);$("wizardNextButton").classList.toggle("hidden",state.wizardStep===2);$("saveTaskButton").classList.toggle("hidden",state.wizardStep!==2);
       if(state.wizardStep===1)setTimeout(()=>$("taskName").focus(),50);
     }
     function selectButtons(container,attribute,value){document.querySelectorAll(`#${container} [${attribute}]`).forEach(button=>button.classList.toggle("selected",button.getAttribute(attribute)===String(value)))}
     function resetTaskWizard(){
-      $("taskForm").reset();$("editingTaskId").value="";$("taskDeadline").value="";$("customEstimate").value="30";$("taskWeekday").value=String(new Date().getDay());$("recurringFields").classList.add("hidden");$("moreOptions").classList.add("hidden");$("moreOptionsButton").textContent="＋ More options";
+      $("taskForm").reset();$("editingTaskId").value="";$("taskDeadline").value="";$("customEstimate").value="30";$("taskWeekday").value=String(new Date().getDay());$("recurringFields").classList.add("hidden");$("keepTogetherSwitch").checked=false;$("moreOptions").classList.add("hidden");$("moreOptionsButton").textContent="＋ More options";
       state.wizardDeadlineChoice="none";state.wizardEstimate=30;state.wizardFeeling="neutral";state.wizardSplit="split";
       selectButtons("deadlineChoices","data-deadline-choice","none");selectButtons("estimateChoices","data-estimate","30");selectButtons("feelingChoices","data-feeling","neutral");selectButtons("splitChoices","data-split","split");setWizardStep(1);$("taskModalTitle").textContent="Add a task";$("saveTaskButton").textContent="Add task";
     }
     function openTaskModal(taskId=null){
       resetTaskWizard();
-      if(taskId){const task=state.tasks.find(item=>item.id===taskId);if(!task)return;$("editingTaskId").value=task.id;$("taskName").value=task.name;$("taskDeadline").value=task.deadline;$("customEstimate").value=task.estimateMinutes;$("taskCategory").value=task.category;$("taskNotes").value=task.notes;$("taskRecurring").checked=task.recurring;$("taskFrequency").value=task.frequency;$("taskWeekday").value=String(task.weekday);$("taskRepeatUntil").value=task.repeatUntil;state.wizardDeadlineChoice="custom";state.wizardEstimate=task.estimateMinutes;state.wizardFeeling=task.feeling;state.wizardSplit=task.allAtOnce?"together":"split";selectButtons("deadlineChoices","data-deadline-choice","custom");selectButtons("estimateChoices","data-estimate",String(task.estimateMinutes));selectButtons("feelingChoices","data-feeling",task.feeling);selectButtons("splitChoices","data-split",state.wizardSplit);if(task.recurring||task.category||task.notes){$("moreOptions").classList.remove("hidden");$("moreOptionsButton").textContent="− Fewer options"}$("recurringFields").classList.toggle("hidden",!task.recurring);$("taskModalTitle").textContent="Edit task";$("saveTaskButton").textContent="Save changes";}
+      if(taskId){const task=state.tasks.find(item=>item.id===taskId);if(!task)return;$("editingTaskId").value=task.id;$("taskName").value=task.name;$("taskDeadline").value=task.deadline;$("customEstimate").value=task.estimateMinutes;$("taskCategory").value=task.category;$("taskNotes").value=task.notes;$("taskRecurring").checked=task.recurring;$("taskFrequency").value=task.frequency;$("taskWeekday").value=String(task.weekday);$("taskRepeatUntil").value=task.repeatUntil;state.wizardDeadlineChoice="custom";state.wizardEstimate=task.estimateMinutes;state.wizardFeeling=task.feeling==="difficult"?"difficult":"neutral";state.wizardSplit=task.allAtOnce?"together":"split";$("keepTogetherSwitch").checked=task.allAtOnce;selectButtons("deadlineChoices","data-deadline-choice","custom");selectButtons("estimateChoices","data-estimate",String(task.estimateMinutes));selectButtons("feelingChoices","data-feeling",task.feeling);selectButtons("splitChoices","data-split",state.wizardSplit);if(task.recurring||task.category||task.notes){$("moreOptions").classList.remove("hidden");$("moreOptionsButton").textContent="− Fewer options"}$("recurringFields").classList.toggle("hidden",!task.recurring);$("taskModalTitle").textContent="Edit task";$("saveTaskButton").textContent="Save changes";}
       $("taskBackdrop").classList.remove("hidden");$("taskModal").classList.remove("hidden");document.body.style.overflow="hidden";
     }
     function closeTaskModal(){$("taskBackdrop").classList.add("hidden");$("taskModal").classList.add("hidden");document.body.style.overflow=""}
@@ -892,7 +1079,7 @@
     function saveTask(event){
       event.preventDefault();const name=$("taskName").value.trim();if(!name){setWizardStep(1);showToast("Add a task name");return}
       const id=$("editingTaskId").value;const current=state.tasks.find(task=>task.id===id);
-      const task={id:id||uid(),name,notes:$("taskNotes").value.trim(),category:$("taskCategory").value.trim(),estimateMinutes:clamp(Number($("customEstimate").value)||state.wizardEstimate,5,2880),deadline:chosenDeadline(),deadlineBlock:"",feeling:state.wizardFeeling,recurring:$("taskRecurring").checked,frequency:$("taskFrequency").value,weekday:Number($("taskWeekday").value),repeatUntil:$("taskRepeatUntil").value,allAtOnce:state.wizardSplit==="together",completed:current?.completed||false,createdAt:current?.createdAt||new Date().toISOString()};
+      const task={id:id||uid(),name,notes:$("taskNotes").value.trim(),category:$("taskCategory").value.trim(),estimateMinutes:clamp(Number($("customEstimate").value)||state.wizardEstimate,5,2880),deadline:chosenDeadline(),deadlineBlock:"",feeling:state.wizardFeeling,recurring:$("taskRecurring").checked,frequency:$("taskFrequency").value,weekday:Number($("taskWeekday").value),repeatUntil:$("taskRepeatUntil").value,allAtOnce:$("keepTogetherSwitch").checked||state.wizardSplit==="together",completed:current?.completed||false,createdAt:current?.createdAt||new Date().toISOString()};
       if(current)state.tasks[state.tasks.findIndex(item=>item.id===id)]=task;else state.tasks.push(task);
       persist();closeTaskModal();renderAll();switchView("todayView");showToast(current?"Task updated":"Task added to your plan");
     }
@@ -1006,7 +1193,7 @@
     function bindEvents(){
       document.addEventListener("click",handleAction);
       document.querySelectorAll(".nav-btn").forEach(button=>button.addEventListener("click",()=>switchView(button.dataset.view)));
-      ["todayAddTaskButton","planAddTaskButton","tasksAddTaskButton"].forEach(id=>$(id).addEventListener("click",()=>openTaskModal()));
+      ["freshAddTaskButton","todayAddTaskButton","planAddTaskButton","tasksAddTaskButton"].forEach(id=>$(id).addEventListener("click",()=>openTaskModal()));
       $("openPlanButton").addEventListener("click",()=>switchView("planView"));$("adjustTodayButton").addEventListener("click",openAdjust);$("fixPlanButton").addEventListener("click",openAdjust);
       $("balanceWeekButton").addEventListener("click",balanceWeek);$("previousWeekButton").addEventListener("click",()=>{if(state.weekOffset>0){state.weekOffset--;renderAll()}});$("nextWeekButton").addEventListener("click",()=>{state.weekOffset++;renderAll()});
       document.querySelectorAll(".filter-btn").forEach(button=>button.addEventListener("click",()=>{state.taskFilter=button.dataset.filter;document.querySelectorAll(".filter-btn").forEach(item=>item.classList.toggle("active",item===button));renderTasks()}));
