@@ -1017,13 +1017,21 @@
       const start=timeToMinutes(state.settings.blockTimes[block].start),end=timeToMinutes(state.settings.blockTimes[block].end),now=nowMinutes();
       if(now>=end)return "ended";if(now<start)return "future";return "active";
     }
-    function availableCapacity(day,block){
-      if(isUnavailable(day.date,block))return 0;
+    function usableBlockCapacity(day,block){
+      if(!day||isUnavailable(day.date,block))return 0;
       let capacity=blockCapacity(block);
-      if(day.index===0){const end=timeToMinutes(state.settings.blockTimes[block].end);const start=timeToMinutes(state.settings.blockTimes[block].start);capacity=Math.max(0,end-Math.max(start,nowMinutes()));}
-      const used=day.blocks[block].reduce((sum,item)=>sum+(isSessionDone(item.key)?0:item.minutes),0);
-      return Math.max(0,capacity-used);
+      if(day.index===0){
+        const end=timeToMinutes(state.settings.blockTimes[block].end),start=timeToMinutes(state.settings.blockTimes[block].start);
+        capacity=Math.max(0,end-Math.max(start,nowMinutes()));
+      }
+      return capacity;
     }
+    function usableDayCapacity(day){return BLOCKS.reduce((sum,block)=>sum+usableBlockCapacity(day,block),0)}
+    function scheduledMinutes(items){return items.reduce((sum,item)=>sum+(isSessionDone(item.key)?0:item.minutes),0)}
+    function blockLoad(day,block){return scheduledMinutes(day?.blocks?.[block]||[])}
+    function difficultBlockLoad(day,block){return (day?.blocks?.[block]||[]).reduce((sum,item)=>sum+(!isSessionDone(item.key)&&item.task.feeling==="difficult"?item.minutes:0),0)}
+    function difficultBlockCount(day,block){return (day?.blocks?.[block]||[]).filter(item=>!isSessionDone(item.key)&&item.task.feeling==="difficult").length}
+    function availableCapacity(day,block){return Math.max(0,usableBlockCapacity(day,block)-blockLoad(day,block))}
     function isUnavailable(date,block){
       return state.settings.unavailableBlocks.some(rule=>rule.block===block&&(rule.recurring?Number(rule.weekday)===date.getDay():rule.date===dateKey(date)));
     }
@@ -1059,20 +1067,65 @@
 
     function sessionLabel(index,total){if(total===1)return "Finish";if(index===0)return "Start";if(index===total-1)return "Finish";return "Continue"}
 
-    function chooseSlot(dayIndices,task,minutes,targetDayIndex,deadline){
+    const SCHEDULE_PHASES={
+      initial:{day:95,block:175,difficulty:145,difficultCount:18,target:.9,sameDay:34,sameBlock:16,overload:25000},
+      overload:{day:25,block:40,difficulty:20,difficultCount:4,target:.3,sameDay:8,sameBlock:4,overload:120000},
+      difficulty:{day:55,block:80,difficulty:420,difficultCount:65,target:.5,sameDay:20,sameBlock:10,overload:120000},
+      general:{day:150,block:245,difficulty:150,difficultCount:20,target:.7,sameDay:36,sameBlock:18,overload:120000}
+    };
+
+    function slotAllowed(item,day,block){
+      if(!day||day.index<item.earliestDayIndex||day.index>item.latestDayIndex)return false;
+      if(usableBlockCapacity(day,block)<=0)return false;
+      if(item.dueDate&&sameDay(day.date,item.dueDate)&&item.task.deadlineBlock){
+        const dueBlockIndex=BLOCKS.indexOf(item.task.deadlineBlock);
+        if(BLOCKS.indexOf(block)>dueBlockIndex)return false;
+      }
+      return true;
+    }
+
+    function slotHasHardCapacity(item,day,block){
+      const minutes=isSessionDone(item.key)?0:item.minutes;
+      return blockLoad(day,block)+minutes<=usableBlockCapacity(day,block)&&day.load+minutes<=usableDayCapacity(day);
+    }
+
+    function slotScore(item,day,block,phaseName="initial"){
+      const weights=SCHEDULE_PHASES[phaseName]||SCHEDULE_PHASES.initial;
+      const minutes=isSessionDone(item.key)?0:item.minutes;
+      const blockCap=Math.max(1,usableBlockCapacity(day,block));
+      const dayCap=Math.max(1,usableDayCapacity(day));
+      const blockAfter=blockLoad(day,block)+minutes;
+      const dayAfter=day.load+minutes;
+      const blockOver=Math.max(0,blockAfter-blockCap);
+      const dayOver=Math.max(0,dayAfter-dayCap);
+      const sameTaskDay=day.items.filter(other=>other.taskId===item.taskId&&!isSessionDone(other.key)).length;
+      const sameTaskBlock=day.blocks[block].filter(other=>other.taskId===item.taskId&&!isSessionDone(other.key)).length;
+      let score=0;
+      score+=(blockOver*blockOver+dayOver*dayOver)*weights.overload;
+      score+=Math.pow(blockAfter/blockCap,2)*weights.block;
+      score+=Math.pow(dayAfter/dayCap,2)*weights.day;
+      score+=Math.abs(day.index-item.targetDayIndex)*weights.target;
+      score+=sameTaskDay*weights.sameDay+sameTaskBlock*weights.sameBlock;
+      if(item.task.feeling==="difficult"){
+        const difficultAfter=difficultBlockLoad(day,block)+minutes;
+        const difficultCountAfter=difficultBlockCount(day,block)+1;
+        score+=Math.pow(difficultAfter/blockCap,2)*weights.difficulty;
+        score+=Math.pow(difficultCountAfter,2)*(weights.difficultCount||0);
+        score+=block===state.settings.highEnergyBlock?-10:3;
+      }
+      if(day.index===0&&blockState(0,block)==="active")score-=3;
+      score+=BLOCKS.indexOf(block)*.001+day.index*.00001;
+      return score;
+    }
+
+    function chooseSlotForItem(item,phaseName="initial",allowOverload=false){
       let best=null;
-      for(const dayIndex of dayIndices){
+      for(let dayIndex=item.earliestDayIndex;dayIndex<=item.latestDayIndex;dayIndex++){
         const day=state.masterPlan[dayIndex];if(!day)continue;
-        if(deadline&&day.date>deadline)continue;
         for(const block of BLOCKS){
-          if(availableCapacity(day,block)<minutes)continue;
-          if(deadline&&sameDay(day.date,deadline)&&task.deadlineBlock){
-            const dueBlockIndex=BLOCKS.indexOf(task.deadlineBlock);if(BLOCKS.indexOf(block)>dueBlockIndex)continue;
-          }
-          const loadRatio=(day.load+minutes)/Math.max(1,MAX_DAY_MINUTES);
-          let score=Math.abs(dayIndex-targetDayIndex)*8+loadRatio*100+day.items.length*2;
-          if(task.feeling==="difficult"&&block===state.settings.highEnergyBlock)score-=18;
-          if(dayIndex===0&&blockState(0,block)==="active")score-=4;
+          if(!slotAllowed(item,day,block))continue;
+          if(!allowOverload&&!slotHasHardCapacity(item,day,block))continue;
+          const score=slotScore(item,day,block,phaseName);
           if(!best||score<best.score)best={day,block,score};
         }
       }
@@ -1083,20 +1136,62 @@
       slot.day.items.push(item);slot.day.blocks[slot.block].push(item);slot.day.load+=isSessionDone(item.key)?0:item.minutes;item.block=slot.block;item.dayIndex=slot.day.index;
     }
 
-    function manualSlotFor(item,deadline){
+    function removeItem(item){
+      const day=state.masterPlan[item.dayIndex];if(!day||!item.block)return;
+      day.items=day.items.filter(other=>other.key!==item.key);
+      day.blocks[item.block]=day.blocks[item.block].filter(other=>other.key!==item.key);
+      if(!isSessionDone(item.key))day.load=Math.max(0,day.load-item.minutes);
+      item.block="";item.dayIndex=null;
+    }
+
+    function manualSlotFor(item){
       const move=state.manualMoves[item.key];if(!move)return null;
       const dayIndex=state.masterPlan.findIndex(day=>dateKey(day.date)===move.date);if(dayIndex<0)return null;
-      const day=state.masterPlan[dayIndex];if(deadline&&day.date>deadline)return null;
-      if(availableCapacity(day,move.block)<item.minutes)return null;
-      if(isUnavailable(day.date,move.block))return null;
-      return {day,block:move.block,score:-999};
+      const day=state.masterPlan[dayIndex];if(!slotAllowed(item,day,move.block))return null;
+      return {day,block:move.block,score:-999,pinned:true};
+    }
+
+    function deadlineIsNear(item){return item.dueDate&&daysBetween(dateStart(),item.dueDate)<=2}
+
+    function currentSlotStress(item,phaseName){
+      const day=state.masterPlan[item.dayIndex];if(!day||!item.block)return -Infinity;
+      if(phaseName==="overload"){
+        return Math.max(0,blockLoad(day,item.block)-usableBlockCapacity(day,item.block))+Math.max(0,day.load-usableDayCapacity(day));
+      }
+      if(phaseName==="difficulty")return item.task.feeling==="difficult"?difficultBlockLoad(day,item.block)/Math.max(1,usableBlockCapacity(day,item.block)):0;
+      return blockLoad(day,item.block)/Math.max(1,usableBlockCapacity(day,item.block))+day.load/Math.max(1,usableDayCapacity(day));
+    }
+
+    function rebalancePhase(items,phaseName,passes=2){
+      for(let pass=0;pass<passes;pass++){
+        let moved=0;
+        const movable=items.filter(item=>item.dayIndex!==null&&!item.pinned&&!isSessionDone(item.key))
+          .sort((a,b)=>currentSlotStress(b,phaseName)-currentSlotStress(a,phaseName)||(a.latestDayIndex-b.latestDayIndex)||(b.minutes-a.minutes)||a.key.localeCompare(b.key));
+        for(const item of movable){
+          const originalDay=state.masterPlan[item.dayIndex],originalBlock=item.block;
+          removeItem(item);
+          const originalScore=slotScore(item,originalDay,originalBlock,phaseName);
+          let best=chooseSlotForItem(item,phaseName,false);
+          if(!best&&deadlineIsNear(item))best=chooseSlotForItem(item,phaseName,true);
+          if(best&&(best.day.index!==originalDay.index||best.block!==originalBlock)&&best.score<originalScore-.25){
+            placeItem(item,best);moved++;
+          }else placeItem(item,{day:originalDay,block:originalBlock});
+        }
+        if(!moved)break;
+      }
+    }
+
+    function balancePlacedItems(items){
+      rebalancePhase(items,"overload",3);
+      rebalancePhase(items,"difficulty",2);
+      rebalancePhase(items,"general",3);
     }
 
     function buildPlan(){
-      const horizonDays=Math.max(90,(state.weekOffset+2)*7);const start=dateStart();
+      const horizonDays=Math.max(90,(state.weekOffset+2)*7),start=dateStart();
       state.masterPlan=Array.from({length:horizonDays},(_,index)=>createDay(addDays(start,index),index));
       state.unscheduled=[];state.instanceKeys=new Map();state.taskProgress=new Map();
-      const horizonEnd=state.masterPlan.at(-1).date;const instances=[];
+      const horizonEnd=state.masterPlan.at(-1).date,instances=[];
 
       state.tasks.filter(task=>!task.completed).forEach(task=>{
         if(task.recurring){
@@ -1107,28 +1202,49 @@
         }else if(task.deadline){
           let due=parseDate(task.deadline);if(due<start)due=start;
           instances.push({task,dueDate:due,windowStart:start,instanceId:`${task.id}-once`,flexible:false});
-        }else{
-          instances.push({task,dueDate:addDays(start,13),windowStart:start,instanceId:`${task.id}-flex`,flexible:true});
-        }
+        }else instances.push({task,dueDate:addDays(start,13),windowStart:start,instanceId:`${task.id}-flex`,flexible:true});
       });
 
-      instances.sort((a,b)=>a.flexible!==b.flexible?(a.flexible?1:-1):(a.dueDate-b.dueDate)||((b.task.feeling==="difficult")-(a.task.feeling==="difficult")));
+      instances.sort((a,b)=>a.flexible!==b.flexible?(a.flexible?1:-1):(a.dueDate-b.dueDate)||((a.dueDate-a.windowStart)-(b.dueDate-b.windowStart))||((b.task.allAtOnce?1:0)-(a.task.allAtOnce?1:0))||((b.task.feeling==="difficult")-(a.task.feeling==="difficult"))||String(a.task.createdAt).localeCompare(String(b.task.createdAt)));
 
+      const allItems=[];
       for(const instance of instances){
         const first=clamp(daysBetween(start,instance.windowStart),0,state.masterPlan.length-1);
         const last=clamp(daysBetween(start,instance.dueDate),0,state.masterPlan.length-1);
-        const dayIndices=Array.from({length:Math.max(0,last-first+1)},(_,i)=>first+i);
-        const chunks=splitMinutes(instance.task,dayIndices.length);const keys=[];
+        const dayCount=Math.max(1,last-first+1);
+        const chunks=splitMinutes(instance.task,dayCount),keys=[];
         chunks.forEach((minutes,index)=>keys.push(`${instance.instanceId}|${index}|${chunks.length}`));
         state.instanceKeys.set(instance.instanceId,keys);
-
         chunks.forEach((minutes,index)=>{
-          const key=keys[index];const target=chunks.length===1?last:Math.round(first+index*(last-first)/Math.max(1,chunks.length-1));
-          const item={key,instanceId:instance.instanceId,taskId:instance.task.id,task:instance.task,minutes,label:sessionLabel(index,chunks.length),chunkIndex:index,chunkCount:chunks.length,dueDate:instance.dueDate,flexible:instance.flexible};
-          let slot=manualSlotFor(item,instance.dueDate)||chooseSlot(dayIndices,instance.task,minutes,target,instance.dueDate);
-          if(slot)placeItem(item,slot);else if(!isSessionDone(key))state.unscheduled.push({taskId:instance.task.id,name:instance.task.name,minutes,dueDate:instance.dueDate});
+          const target=chunks.length===1?first:Math.round(first+index*(last-first)/Math.max(1,chunks.length-1));
+          allItems.push({key:keys[index],instanceId:instance.instanceId,taskId:instance.task.id,task:instance.task,minutes,label:sessionLabel(index,chunks.length),chunkIndex:index,chunkCount:chunks.length,dueDate:instance.dueDate,flexible:instance.flexible,earliestDayIndex:first,latestDayIndex:last,targetDayIndex:target,block:"",dayIndex:null,pinned:false});
         });
       }
+
+      const pinned=allItems.filter(item=>state.manualMoves[item.key]);
+      for(const item of pinned){
+        const slot=manualSlotFor(item);
+        if(slot){item.pinned=true;placeItem(item,slot)}
+        else delete state.manualMoves[item.key];
+      }
+
+      const automatic=allItems.filter(item=>item.dayIndex===null).sort((a,b)=>(a.latestDayIndex-b.latestDayIndex)||((a.latestDayIndex-a.earliestDayIndex)-(b.latestDayIndex-b.earliestDayIndex))||((b.task.allAtOnce?1:0)-(a.task.allAtOnce?1:0))||((b.task.feeling==="difficult")-(a.task.feeling==="difficult"))||(a.targetDayIndex-b.targetDayIndex)||(b.minutes-a.minutes)||a.key.localeCompare(b.key));
+      for(const item of automatic){
+        let slot=chooseSlotForItem(item,"initial",false);
+        if(!slot&&deadlineIsNear(item))slot=chooseSlotForItem(item,"initial",true);
+        if(slot)placeItem(item,slot);
+      }
+
+      const placed=allItems.filter(item=>item.dayIndex!==null);
+      balancePlacedItems(placed);
+
+      for(const item of allItems.filter(item=>item.dayIndex===null)){
+        let slot=chooseSlotForItem(item,"general",false);
+        if(!slot&&deadlineIsNear(item))slot=chooseSlotForItem(item,"general",true);
+        if(slot){placeItem(item,slot);placed.push(item)}
+        else if(!isSessionDone(item.key))state.unscheduled.push({taskId:item.task.id,name:item.task.name,minutes:item.minutes,dueDate:item.dueDate});
+      }
+      balancePlacedItems(placed);
 
       state.tasks.forEach(task=>{
         const allKeys=[];for(const [instanceId,keys] of state.instanceKeys)if(instanceId.startsWith(task.id+"-"))allKeys.push(...keys);
@@ -1279,7 +1395,7 @@
       for(const item of items){if(total<=target)break;const placement=findLaterPlacement(item,0);if(placement){state.manualMoves[item.key]=placement;total-=item.minutes;moved++}}
       if(moved){persist();renderAll();showToast(`Moved ${moved} focus ${moved===1?"block":"blocks"} to later days`)}else showToast("Nothing flexible could be moved safely");closeAdjust();
     }
-    function balanceWeek(){state.manualMoves={};persist();renderAll();closeAdjust();showToast("Your week has been balanced")}
+    function balanceWeek(){state.manualMoves={};persist();renderAll();closeAdjust();showToast("Balanced deadlines, workload, and difficult tasks")}
     function blockRestOfToday(){
       for(const block of BLOCKS){if(blockState(0,block)!=="ended"&&!isUnavailable(dateStart(),block))state.settings.unavailableBlocks.push({id:uid(),date:dateKey(new Date()),block,recurring:false,weekday:new Date().getDay()})}
       persist();renderAll();closeAdjust();showToast("Remaining work moved out of today")
