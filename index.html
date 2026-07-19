@@ -752,9 +752,16 @@
       .topbar{gap:10px;align-items:center}
       .brand{gap:9px}.brand h1{font-size:1.16rem;white-space:nowrap}
       .brand-mark{width:38px;height:38px;font-size:17px}
-      .top-actions{gap:7px}
-      #freshAddTaskButton{min-height:42px;padding:8px 14px;font-size:.82rem;white-space:nowrap}
+      .top-actions{gap:6px;flex:0 0 auto}
+      #freshAddTaskButton{min-height:42px;padding:8px 13px;font-size:.8rem;white-space:nowrap}
       .icon-btn{width:42px;height:42px}
+      /* Keep account access visible on phones. */
+      #signInButton:not(.hidden),#signOutButton:not(.hidden){
+        display:inline-flex!important;align-items:center;justify-content:center;
+        min-height:42px;padding:8px 10px;border:1px solid var(--line);
+        border-radius:999px;background:rgba(255,255,255,.62);color:#66747c;
+        font-size:.76rem;line-height:1;white-space:nowrap;
+      }
 
       .nav{left:12px;right:12px;bottom:12px;padding:6px 12px}
       .nav-btn{font-size:.84rem;min-width:76px}
@@ -840,8 +847,15 @@
     }
 
     @media(max-width:370px){
-      #freshAddTaskButton{padding-inline:11px;font-size:.78rem}
-      .brand h1{font-size:1.08rem}
+      .app{padding-inline:14px}
+      .topbar{gap:7px}
+      .brand-mark{display:none}
+      .brand h1{font-size:1.04rem}
+      .top-actions{gap:5px}
+      #freshAddTaskButton{width:42px;min-width:42px;padding:0;font-size:0;border-radius:50%}
+      #freshAddTaskButton::before{content:"＋";font-size:1.08rem;line-height:1}
+      #signInButton:not(.hidden),#signOutButton:not(.hidden){padding-inline:8px;font-size:.73rem}
+      .icon-btn{width:40px;height:40px}
       #planView .toolbar-actions{grid-template-columns:1fr}
       .choice-grid,.split-choice,.form-row{grid-template-columns:1fr}
     }
