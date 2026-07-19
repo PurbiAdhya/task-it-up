@@ -231,6 +231,12 @@
     .choice.selected{border-color:var(--primary);background:var(--primary-soft);box-shadow:inset 0 0 0 1px var(--primary)}
     .choice small{display:block;color:var(--muted);font-size:.69rem;font-weight:750;margin-top:3px}
     .date-custom,.time-custom{margin-top:11px}
+    .date-custom.is-selected input{
+      border-color:#c8c0da;background:var(--lavender-soft);
+      box-shadow:inset 0 0 0 1px rgba(153,146,180,.28);
+    }
+    .duration-entry{display:grid;grid-template-columns:minmax(0,1fr) 132px;gap:9px}
+    .duration-entry input,.duration-entry select{width:100%}
     .feeling-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
     .feeling{border:1px solid var(--line);border-radius:17px;background:white;padding:13px 8px;min-height:74px;text-align:center;font-weight:900}
     .feeling span{display:block;font-size:1.4rem;margin-bottom:4px}
@@ -738,6 +744,7 @@
       .task-card-main{padding-left:8px}
       .task-progress{max-width:none}
       .task-card-actions{justify-content:flex-start;padding-left:8px}
+      .duration-entry{grid-template-columns:minmax(0,1fr) 112px}
     }
   </style>
 
@@ -980,7 +987,7 @@
         <input type="hidden" id="editingTaskId" />
         <section class="wizard-step active" data-step="1">
           <h3>What needs your attention?</h3>
-          <div class="field"><label for="taskName">Task</label><input id="taskName" maxlength="120" autocomplete="off" placeholder="Review the paper" required /></div>
+          <div class="field"><label for="taskName">Task</label><input id="taskName" maxlength="120" autocomplete="off" placeholder="Study" required /></div>
           <div class="field" style="margin-top:24px"><label>When should it be finished?</label></div>
           <div class="choice-grid" id="deadlineChoices">
             <button class="choice" type="button" data-deadline-choice="today">Today</button>
@@ -988,7 +995,7 @@
             <button class="choice" type="button" data-deadline-choice="week">This week</button>
             <button class="choice selected" type="button" data-deadline-choice="none">No deadline</button>
           </div>
-          <div class="field date-custom"><label for="taskDeadline">Choose another date</label><input id="taskDeadline" type="date" /></div>
+          <div class="field date-custom" id="customDeadlineField"><input id="taskDeadline" type="date" aria-label="Choose a deadline date" /></div>
         </section>
         <section class="wizard-step" data-step="2">
           <h3>How much time will it take?</h3>
@@ -998,7 +1005,7 @@
             <button class="choice" type="button" data-estimate="60">1 hour</button>
             <button class="choice" type="button" data-estimate="120">2 hours</button>
           </div>
-          <div class="field time-custom"><label for="customEstimate">Or enter minutes</label><input id="customEstimate" type="number" min="5" max="2880" step="5" value="30" /></div>
+          <div class="field time-custom"><label for="customEstimate">Or enter a custom time</label><div class="duration-entry"><input id="customEstimate" type="number" min="5" max="120" step="5" value="30" inputmode="decimal" /><select id="customEstimateUnit" aria-label="Time unit"><option value="minutes">Minutes</option><option value="hours">Hours</option></select></div></div>
           <div class="field" style="margin-top:24px"><label>Starting this feels…</label></div>
           <div class="feeling-grid" id="feelingChoices">
             <button class="feeling selected" type="button" data-feeling="neutral">Straightforward</button>
@@ -1185,6 +1192,21 @@
     function formatDate(date,options){return new Intl.DateTimeFormat(undefined,options).format(date)}
     function formatMinutes(minutes){const n=Math.max(0,Math.round(Number(minutes)||0));if(n<60)return `${n}m`;const h=Math.floor(n/60),m=n%60;return m?`${h}h ${m}m`:`${h}h`}
     function timeToMinutes(value){const [h,m]=String(value||"00:00").split(":").map(Number);return h*60+m}
+    function configuredBlockMinutes(block,times=state.settings.blockTimes){
+      const range=times?.[block];
+      if(!range?.start||!range?.end)return 0;
+      return Math.max(0,timeToMinutes(range.end)-timeToMinutes(range.start));
+    }
+    function blockTimelinePosition(dayIndex,block,times=state.settings.blockTimes){
+      const starts=BLOCKS.map(name=>timeToMinutes(times[name]?.start)).filter(Number.isFinite);
+      const ends=BLOCKS.map(name=>timeToMinutes(times[name]?.end)).filter(Number.isFinite);
+      const dayStart=starts.length?Math.min(...starts):0;
+      const dayEnd=ends.length?Math.max(...ends):1440;
+      const range=times[block]||{start:"00:00",end:"00:00"};
+      const center=(timeToMinutes(range.start)+timeToMinutes(range.end))/2;
+      const withinDay=(center-dayStart)/Math.max(1,dayEnd-dayStart)*BLOCKS.length;
+      return dayIndex*BLOCKS.length+withinDay;
+    }
     function nowMinutes(){const d=new Date();return d.getHours()*60+d.getMinutes()}
     function feelingFromLegacy(task){if(task.feeling)return task.feeling;const m=Number(task.motivation||2);return m===1?"easy":m===3?"difficult":"neutral"}
     function estimateFromLegacy(task){if(Number(task.estimateMinutes)>0)return Number(task.estimateMinutes);const amount=Number(task.amount)||30;return task.unit==="hours"?Math.round(amount*60):Math.round(amount)}
@@ -1258,7 +1280,7 @@
 
     function focusMinutes(task){return task.feeling==="difficult"?20:task.feeling==="easy"?40:30}
     function difficultyWeight(task){return task.feeling==="difficult"?1.5:task.feeling==="easy"?.75:1}
-    function blockCapacity(block){const times=state.settings.blockTimes[block];return Math.min(MAX_BLOCK_MINUTES,Math.max(0,timeToMinutes(times.end)-timeToMinutes(times.start)))}
+    function blockCapacity(block){return Math.min(MAX_BLOCK_MINUTES,configuredBlockMinutes(block))}
     function blockState(dayIndex,block){
       if(dayIndex>0)return "future";if(dayIndex<0)return "ended";
       const start=timeToMinutes(state.settings.blockTimes[block].start),end=timeToMinutes(state.settings.blockTimes[block].end),now=nowMinutes();
@@ -1367,7 +1389,7 @@
       score+=(normalized(dayAfter/dayCap)-normalized(dayBefore/dayCap))*weights.day;
       score+=(normalized(blockCogAfter/(blockCap*1.15))-normalized(blockCogBefore/(blockCap*1.15)))*weights.cognitive;
       score+=(normalized(dayCogAfter/(dayCap*1.15))-normalized(dayCogBefore/(dayCap*1.15)))*(weights.cognitive*.45);
-      score+=Math.abs(slotOrdinal(day.index,block)-item.targetSlotOrdinal)*weights.target;
+      score+=Math.abs(blockTimelinePosition(day.index,block)-item.targetTimelinePosition)*weights.target;
       score+=sameTaskDay*weights.sameDay+sameTaskBlock*weights.sameBlock;
       score+=placementChangeDistance(item,day,block)*weights.stability;
       if(item.task.feeling==="difficult"){
@@ -1519,15 +1541,24 @@
     }
 
     function candidateSlotsForInstance(first,last,task,dueDate){
-      const slots=[];
+      const slots=[];let cumulativeCapacity=0;
       for(let dayIndex=first;dayIndex<=last;dayIndex++){
         const day=state.masterPlan[dayIndex];if(!day)continue;
         for(const block of BLOCKS){
-          if(usableBlockCapacity(day,block)<=0)continue;
+          const capacity=usableBlockCapacity(day,block);
+          if(capacity<=0)continue;
           if(dueDate&&sameDay(day.date,dueDate)&&task.deadlineBlock&&BLOCKS.indexOf(block)>BLOCKS.indexOf(task.deadlineBlock))continue;
-          slots.push({dayIndex,block,ordinal:slotOrdinal(dayIndex,block)});
+          const startCapacity=cumulativeCapacity;
+          cumulativeCapacity+=capacity;
+          slots.push({
+            dayIndex,block,capacity,startCapacity,endCapacity:cumulativeCapacity,
+            capacityCenter:startCapacity+capacity/2,
+            ordinal:slotOrdinal(dayIndex,block),
+            timelinePosition:blockTimelinePosition(dayIndex,block)
+          });
         }
       }
+      slots.totalCapacity=cumulativeCapacity;
       return slots;
     }
 
@@ -1574,10 +1605,13 @@
         state.instanceKeys.set(instance.instanceId,keys);
         const preferredSlots=candidateSlotsForInstance(first,last,instance.task,instance.dueDate);
         chunks.forEach((minutes,index)=>{
-          const targetIndex=preferredSlots.length?(chunks.length===1?Math.floor((preferredSlots.length-1)/2):Math.round(index*(preferredSlots.length-1)/Math.max(1,chunks.length-1))):0;
-          const target=preferredSlots[targetIndex]||{dayIndex:first,block:"morning",ordinal:slotOrdinal(first,"morning")};
+          const totalCapacity=preferredSlots.totalCapacity||0;
+          const targetCapacity=totalCapacity?((index+.5)/Math.max(1,chunks.length))*totalCapacity:0;
+          const target=preferredSlots.length
+            ?preferredSlots.reduce((best,slot)=>Math.abs(slot.capacityCenter-targetCapacity)<Math.abs(best.capacityCenter-targetCapacity)?slot:best,preferredSlots[0])
+            :{dayIndex:first,block:"morning",ordinal:slotOrdinal(first,"morning"),timelinePosition:blockTimelinePosition(first,"morning")};
           const key=keys[index],priorSlot=state.autoPlacements[key]||null;
-          allItems.push({key,instanceId:instance.instanceId,taskId:instance.task.id,task:instance.task,minutes,label:sessionLabel(index,chunks.length),chunkIndex:index,chunkCount:chunks.length,dueDate:instance.dueDate,flexible:instance.flexible,earliestDayIndex:first,latestDayIndex:last,targetDayIndex:target.dayIndex,targetBlock:target.block,targetSlotOrdinal:target.ordinal,priorSlot,block:"",dayIndex:null,pinned:false});
+          allItems.push({key,instanceId:instance.instanceId,taskId:instance.task.id,task:instance.task,minutes,label:sessionLabel(index,chunks.length),chunkIndex:index,chunkCount:chunks.length,dueDate:instance.dueDate,flexible:instance.flexible,earliestDayIndex:first,latestDayIndex:last,targetDayIndex:target.dayIndex,targetBlock:target.block,targetSlotOrdinal:target.ordinal,targetTimelinePosition:target.timelinePosition,priorSlot,block:"",dayIndex:null,pinned:false});
         });
       }
 
@@ -1757,14 +1791,42 @@
       if(state.wizardStep===1)setTimeout(()=>$("taskName").focus(),50);
     }
     function selectButtons(container,attribute,value){document.querySelectorAll(`#${container} [${attribute}]`).forEach(button=>button.classList.toggle("selected",button.getAttribute(attribute)===String(value)))}
+    function syncCustomDeadlineHighlight(){
+      $("customDeadlineField").classList.toggle("is-selected",Boolean($("taskDeadline").value));
+    }
+    function cleanDurationNumber(value){
+      const rounded=Math.round(Number(value)*100)/100;
+      return Number.isInteger(rounded)?String(rounded):String(rounded).replace(/0+$/,"").replace(/\.$/,"");
+    }
+    function updateEstimateInputConstraints(){
+      const hours=$("customEstimateUnit").value==="hours";
+      $("customEstimate").min=hours?"0.25":"5";
+      $("customEstimate").max=hours?"48":"120";
+      $("customEstimate").step=hours?"0.25":"5";
+      $("customEstimate").placeholder=hours?"3":"45";
+    }
+    function estimateMinutesFromInput(){
+      const amount=Number($("customEstimate").value);
+      if(!Number.isFinite(amount)||amount<=0)return state.wizardEstimate||30;
+      return clamp(Math.round(amount*($("customEstimateUnit").value==="hours"?60:1)),5,2880);
+    }
+    function setEstimateInputFromMinutes(minutes,{preferHours=minutes>120}={}){
+      const safe=clamp(Math.round(Number(minutes)||30),5,2880);
+      state.wizardEstimate=safe;
+      $("customEstimateUnit").value=preferHours?"hours":"minutes";
+      updateEstimateInputConstraints();
+      $("customEstimate").value=preferHours?cleanDurationNumber(safe/60):String(safe);
+      selectButtons("estimateChoices","data-estimate",String(safe));
+    }
     function resetTaskWizard(){
-      $("taskForm").reset();$("editingTaskId").value="";$("taskDeadline").value="";$("customEstimate").value="30";$("taskWeekday").value=String(new Date().getDay());$("recurringFields").classList.add("hidden");$("keepTogetherSwitch").checked=false;$("moreOptions").classList.add("hidden");$("moreOptionsButton").textContent="＋ More options";
+      $("taskForm").reset();$("editingTaskId").value="";$("taskDeadline").value="";$("taskWeekday").value=String(new Date().getDay());$("recurringFields").classList.add("hidden");$("keepTogetherSwitch").checked=false;$("moreOptions").classList.add("hidden");$("moreOptionsButton").textContent="＋ More options";
       state.wizardDeadlineChoice="none";state.wizardEstimate=30;state.wizardFeeling="neutral";state.wizardSplit="split";
+      syncCustomDeadlineHighlight();setEstimateInputFromMinutes(30,{preferHours:false});
       selectButtons("deadlineChoices","data-deadline-choice","none");selectButtons("estimateChoices","data-estimate","30");selectButtons("feelingChoices","data-feeling","neutral");selectButtons("splitChoices","data-split","split");setWizardStep(1);$("taskModalTitle").textContent="Add a task";$("saveTaskButton").textContent="Add task";
     }
     function openTaskModal(taskId=null){
       resetTaskWizard();
-      if(taskId){const task=state.tasks.find(item=>item.id===taskId);if(!task)return;$("editingTaskId").value=task.id;$("taskName").value=task.name;$("taskDeadline").value=task.deadline;$("customEstimate").value=task.estimateMinutes;$("taskCategory").value=task.category;$("taskNotes").value=task.notes;$("taskRecurring").checked=task.recurring;$("taskFrequency").value=task.frequency;$("taskWeekday").value=String(task.weekday);$("taskRepeatUntil").value=task.repeatUntil;state.wizardDeadlineChoice="custom";state.wizardEstimate=task.estimateMinutes;state.wizardFeeling=task.feeling==="difficult"?"difficult":"neutral";state.wizardSplit=task.allAtOnce?"together":"split";$("keepTogetherSwitch").checked=task.allAtOnce;selectButtons("deadlineChoices","data-deadline-choice","custom");selectButtons("estimateChoices","data-estimate",String(task.estimateMinutes));selectButtons("feelingChoices","data-feeling",task.feeling);selectButtons("splitChoices","data-split",state.wizardSplit);if(task.recurring||task.category||task.notes){$("moreOptions").classList.remove("hidden");$("moreOptionsButton").textContent="− Fewer options"}$("recurringFields").classList.toggle("hidden",!task.recurring);$("taskModalTitle").textContent="Edit task";$("saveTaskButton").textContent="Save changes";}
+      if(taskId){const task=state.tasks.find(item=>item.id===taskId);if(!task)return;$("editingTaskId").value=task.id;$("taskName").value=task.name;$("taskDeadline").value=task.deadline;setEstimateInputFromMinutes(task.estimateMinutes);$("taskCategory").value=task.category;$("taskNotes").value=task.notes;$("taskRecurring").checked=task.recurring;$("taskFrequency").value=task.frequency;$("taskWeekday").value=String(task.weekday);$("taskRepeatUntil").value=task.repeatUntil;state.wizardDeadlineChoice="custom";state.wizardEstimate=task.estimateMinutes;state.wizardFeeling=task.feeling==="difficult"?"difficult":"neutral";state.wizardSplit=task.allAtOnce?"together":"split";$("keepTogetherSwitch").checked=task.allAtOnce;selectButtons("deadlineChoices","data-deadline-choice","custom");selectButtons("estimateChoices","data-estimate",String(task.estimateMinutes));selectButtons("feelingChoices","data-feeling",task.feeling);selectButtons("splitChoices","data-split",state.wizardSplit);if(task.recurring||task.category||task.notes){$("moreOptions").classList.remove("hidden");$("moreOptionsButton").textContent="− Fewer options"}$("recurringFields").classList.toggle("hidden",!task.recurring);syncCustomDeadlineHighlight();$("taskModalTitle").textContent="Edit task";$("saveTaskButton").textContent="Save changes";}
       $("taskBackdrop").classList.remove("hidden");$("taskModal").classList.remove("hidden");document.body.style.overflow="hidden";
     }
     function closeTaskModal(){$("taskBackdrop").classList.add("hidden");$("taskModal").classList.add("hidden");document.body.style.overflow=""}
@@ -1776,7 +1838,7 @@
     function saveTask(event){
       event.preventDefault();const name=$("taskName").value.trim();if(!name){setWizardStep(1);showToast("Add a task name");return}
       const id=$("editingTaskId").value;const current=state.tasks.find(task=>task.id===id);
-      const task={id:id||uid(),name,notes:$("taskNotes").value.trim(),category:$("taskCategory").value.trim(),estimateMinutes:clamp(Number($("customEstimate").value)||state.wizardEstimate,5,2880),deadline:chosenDeadline(),deadlineBlock:"",feeling:state.wizardFeeling,recurring:$("taskRecurring").checked,frequency:$("taskFrequency").value,weekday:Number($("taskWeekday").value),repeatUntil:$("taskRepeatUntil").value,allAtOnce:$("keepTogetherSwitch").checked||state.wizardSplit==="together",completed:current?.completed||false,createdAt:current?.createdAt||new Date().toISOString()};
+      const task={id:id||uid(),name,notes:$("taskNotes").value.trim(),category:$("taskCategory").value.trim(),estimateMinutes:estimateMinutesFromInput(),deadline:chosenDeadline(),deadlineBlock:"",feeling:state.wizardFeeling,recurring:$("taskRecurring").checked,frequency:$("taskFrequency").value,weekday:Number($("taskWeekday").value),repeatUntil:$("taskRepeatUntil").value,allAtOnce:$("keepTogetherSwitch").checked||state.wizardSplit==="together",completed:current?.completed||false,createdAt:current?.createdAt||new Date().toISOString()};
       if(current)state.tasks[state.tasks.findIndex(item=>item.id===id)]=task;else state.tasks.push(task);
       persist();closeTaskModal();renderAll();switchView("todayView");showToast(current?"Task updated":"Task added to your plan");
     }
@@ -2033,8 +2095,29 @@
 
     function openSettings(){$("settingsBackdrop").classList.add("open");$("settingsDrawer").classList.add("open");document.body.style.overflow="hidden"}
     function closeSettings(){$("settingsBackdrop").classList.remove("open");$("settingsDrawer").classList.remove("open");document.body.style.overflow=""}
+    function readWorkBoundaries(){
+      const next={};
+      for(const block of BLOCKS){
+        const start=$(block+"Start").value,end=$(block+"End").value;
+        if(!start||!end||timeToMinutes(end)<=timeToMinutes(start)){
+          showToast(`${BLOCK_LABELS[block]} must end after it starts`);
+          return null;
+        }
+        next[block]={start,end};
+      }
+      for(let index=1;index<BLOCKS.length;index++){
+        const previous=BLOCKS[index-1],current=BLOCKS[index];
+        if(timeToMinutes(next[current].start)<timeToMinutes(next[previous].end)){
+          showToast(`${BLOCK_LABELS[previous]} and ${BLOCK_LABELS[current].toLowerCase()} cannot overlap`);
+          return null;
+        }
+      }
+      return next;
+    }
     function saveAvailability(){
-      for(const block of BLOCKS)state.settings.blockTimes[block]={start:$(block+"Start").value,end:$(block+"End").value};
+      const nextBlockTimes=readWorkBoundaries();
+      if(!nextBlockTimes){renderSettings();return}
+      state.settings.blockTimes=nextBlockTimes;
       state.settings.highEnergyBlock=$("highEnergyBlock").value;
       state.settings.timerSound=$("timerSound").value;
       state.settings.backgroundNoise=$("backgroundNoise").value;
@@ -2097,8 +2180,10 @@
       document.querySelectorAll(".filter-btn").forEach(button=>button.addEventListener("click",()=>{state.taskFilter=button.dataset.filter;document.querySelectorAll(".filter-btn").forEach(item=>item.classList.toggle("active",item===button));renderTasks()}));
 
       $("closeTaskModal").addEventListener("click",closeTaskModal);$("taskBackdrop").addEventListener("click",closeTaskModal);$("wizardBackButton").addEventListener("click",()=>setWizardStep(state.wizardStep-1));$("wizardNextButton").addEventListener("click",()=>{if(state.wizardStep===1&&!$("taskName").value.trim()){showToast("Add a task name");return}setWizardStep(state.wizardStep+1)});$("taskForm").addEventListener("submit",saveTask);
-      document.querySelectorAll("[data-deadline-choice]").forEach(button=>button.addEventListener("click",()=>{state.wizardDeadlineChoice=button.dataset.deadlineChoice;$("taskDeadline").value="";selectButtons("deadlineChoices","data-deadline-choice",state.wizardDeadlineChoice)}));$("taskDeadline").addEventListener("change",()=>{if($("taskDeadline").value){state.wizardDeadlineChoice="custom";selectButtons("deadlineChoices","data-deadline-choice","custom")}});
-      document.querySelectorAll("[data-estimate]").forEach(button=>button.addEventListener("click",()=>{state.wizardEstimate=Number(button.dataset.estimate);$("customEstimate").value=state.wizardEstimate;selectButtons("estimateChoices","data-estimate",String(state.wizardEstimate))}));$("customEstimate").addEventListener("input",()=>{state.wizardEstimate=Number($("customEstimate").value)||30;selectButtons("estimateChoices","data-estimate",String(state.wizardEstimate))});
+      document.querySelectorAll("[data-deadline-choice]").forEach(button=>button.addEventListener("click",()=>{state.wizardDeadlineChoice=button.dataset.deadlineChoice;$("taskDeadline").value="";syncCustomDeadlineHighlight();selectButtons("deadlineChoices","data-deadline-choice",state.wizardDeadlineChoice)}));$("taskDeadline").addEventListener("change",()=>{if($("taskDeadline").value){state.wizardDeadlineChoice="custom";selectButtons("deadlineChoices","data-deadline-choice","custom")}syncCustomDeadlineHighlight()});
+      document.querySelectorAll("[data-estimate]").forEach(button=>button.addEventListener("click",()=>setEstimateInputFromMinutes(Number(button.dataset.estimate),{preferHours:false})));
+      $("customEstimate").addEventListener("input",()=>{state.wizardEstimate=estimateMinutesFromInput();selectButtons("estimateChoices","data-estimate",String(state.wizardEstimate))});
+      $("customEstimateUnit").addEventListener("change",()=>{const minutes=state.wizardEstimate||30;updateEstimateInputConstraints();$("customEstimate").value=$("customEstimateUnit").value==="hours"?cleanDurationNumber(minutes/60):String(minutes);selectButtons("estimateChoices","data-estimate",String(minutes))});
       document.querySelectorAll("[data-feeling]").forEach(button=>button.addEventListener("click",()=>{state.wizardFeeling=button.dataset.feeling;selectButtons("feelingChoices","data-feeling",state.wizardFeeling)}));document.querySelectorAll("[data-split]").forEach(button=>button.addEventListener("click",()=>{state.wizardSplit=button.dataset.split;selectButtons("splitChoices","data-split",state.wizardSplit)}));
       $("moreOptionsButton").addEventListener("click",()=>{const hidden=$("moreOptions").classList.toggle("hidden");$("moreOptionsButton").textContent=hidden?"＋ More options":"− Fewer options"});$("taskRecurring").addEventListener("change",()=>$("recurringFields").classList.toggle("hidden",!$("taskRecurring").checked));$("taskFrequency").addEventListener("change",()=>$("weekdayField").classList.toggle("hidden",$("taskFrequency").value!=="weekly"));
 
