@@ -278,6 +278,8 @@
     .drawer-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}.drawer-head h2{margin:0}
     .settings-card{border:1px solid var(--line);border-radius:18px;padding:15px;margin-bottom:12px;background:#fbfdfc}
     .settings-card h3{margin:0 0 13px;font-size:1rem}
+    .settings-save-bar{position:sticky;bottom:0;padding:12px 0 4px;background:linear-gradient(180deg,rgba(255,255,255,0),white 28%);z-index:3}
+    .settings-save-bar .btn{width:100%}
     .settings-time-row{display:grid;grid-template-columns:90px 1fr 1fr;gap:8px;align-items:end;margin-bottom:9px}
     .settings-time-row strong{font-size:.78rem;padding-bottom:14px}
     .settings-time-row label{font-size:.67rem;color:var(--muted);font-weight:850}.settings-time-row input{width:100%;min-height:44px;border:1px solid var(--line);border-radius:12px;padding:8px;background:white}
@@ -1094,7 +1096,7 @@
   <div class="focus-overlay hidden" id="focusOverlay">
     <button class="focus-close" id="closeFocusButton" type="button" aria-label="Close focus mode">×</button>
     <div class="focus-card">
-      <div class="focus-kicker">Focus</div>
+      <div class="focus-kicker" id="focusKicker">Focus</div>
       <h2 class="focus-task" id="focusTaskName"></h2>
       <div class="focus-session" id="focusSessionMeta"></div>
       <div class="timer-ring" id="timerRing"><div class="timer-time" id="timerTime">20:00</div></div>
@@ -1130,12 +1132,25 @@
           <option value="ocean">Ocean</option>
         </select>
       </div>
-      <div class="field" style="margin:0"><label for="timerSound">When time is up</label><select id="timerSound"><option value="gentle">Gentle chime</option><option value="bell">Clear bell</option><option value="none">No sound</option></select></div>
+      <div class="field" style="margin:0"><label for="timerSound">When time is up</label><select id="timerSound">
+        <option value="gentle">Gentle chime</option>
+        <option value="bell">Clear bell</option>
+        <option value="double">Double chime</option>
+        <option value="gong">Soft gong</option>
+        <option value="birds">Bird notes</option>
+        <option value="digital">Digital beep</option>
+        <option value="none">No sound</option>
+      </select></div>
+      <div class="switch-row" style="margin:14px 0 0">
+        <div class="switch-copy"><strong>Automatically start breaks</strong><span>Begin a 5-minute break after a focus block is marked done.</span></div>
+        <label class="switch"><input id="autoStartBreak" type="checkbox" /><span class="slider"></span></label>
+      </div>
     </div>
     <div class="settings-card">
       <h3>Data</h3>
       <button class="btn btn-danger" style="width:100%" id="clearAllButton" type="button">Clear all tasks</button>
     </div>
+    <div class="settings-save-bar"><button class="btn btn-primary" id="saveSettingsButton" type="button">Save settings</button></div>
   </aside>
 
   <div class="toast" id="toast"></div>
@@ -1146,6 +1161,7 @@
     const TASKS_KEY="taskItUpTasksV3";
     const SETTINGS_KEY="taskItUpSettingsV3";
     const PROGRESS_KEY="taskItUpProgressV1";
+    const COMPLETION_LOG_KEY="taskItUpCompletionLogV1";
     const MANUAL_MOVES_KEY="taskItUpManualMovesV1";
     const AUTO_PLACEMENTS_KEY="taskItUpAutoPlacementsV1";
     const TIMER_KEY="taskItUpTimerV2";
@@ -1163,12 +1179,13 @@
       blockTimes:{morning:{start:"08:00",end:"12:00"},afternoon:{start:"12:00",end:"16:00"},evening:{start:"16:00",end:"20:00"}},
       timerSound:"gentle",
       backgroundNoise:"none",
+      autoStartBreak:false,
       unavailableBlocks:[]
     };
 
     const $=id=>document.getElementById(id);
     const state={
-      tasks:[],settings:structuredCloneSafe(defaultSettings),completedSessions:new Set(),manualMoves:{},autoPlacements:{},
+      tasks:[],settings:structuredCloneSafe(defaultSettings),completedSessions:new Set(),completionLog:[],manualMoves:{},autoPlacements:{},
       masterPlan:[],unscheduled:[],overtimeMinutes:0,instanceKeys:new Map(),taskProgress:new Map(),weekOffset:0,taskFilter:"active",
       wizardStep:1,wizardDeadlineChoice:"none",wizardEstimate:30,wizardFeeling:"neutral",wizardSplit:"split",
       activeMoveKey:null,unavailableMode:"weekly",activeTimer:null,timerTicker:null,audioContext:null,ambient:null,todaySuggestionKey:null,todayNudgeKey:null,
@@ -1219,8 +1236,9 @@
           afternoon:{...defaultSettings.blockTimes.afternoon,...(saved.blockTimes?.afternoon||{})},
           evening:{...defaultSettings.blockTimes.evening,...(saved.blockTimes?.evening||{})}
         },
-        timerSound:saved.timerSound||"gentle",
+        timerSound:["gentle","bell","double","gong","birds","digital","none"].includes(saved.timerSound)?saved.timerSound:"gentle",
         backgroundNoise:["none","forest","fire","wind","classroom","library","ocean"].includes(saved.backgroundNoise)?saved.backgroundNoise:"none",
+        autoStartBreak:Boolean(saved.autoStartBreak),
         unavailableBlocks:Array.isArray(saved.unavailableBlocks)?saved.unavailableBlocks.filter(rule=>rule&&rule.id&&rule.block&&(rule.date||Number.isInteger(rule.weekday))):[]
       };
     }
@@ -1260,6 +1278,11 @@
       state.tasks=(Array.isArray(savedTasks)?savedTasks:[]).map(task=>normalizeTask(task,savedSettings));
       const progress=safeParse(storageGet(PROGRESS_KEY),[]);
       state.completedSessions=new Set(Array.isArray(progress)?progress:[]);
+      const completionLog=safeParse(storageGet(COMPLETION_LOG_KEY),[]);
+      state.completionLog=(Array.isArray(completionLog)?completionLog:[]).filter(entry=>entry&&entry.id&&entry.instanceId&&entry.taskId&&Number(entry.minutes)>0).map(entry=>({
+        id:String(entry.id),instanceId:String(entry.instanceId),taskId:String(entry.taskId),minutes:Math.max(1,Math.round(Number(entry.minutes))),
+        date:entry.date||dateKey(new Date()),block:BLOCKS.includes(entry.block)?entry.block:"morning",label:String(entry.label||"Done"),completedAt:entry.completedAt||new Date().toISOString()
+      }));
       state.manualMoves=safeParse(storageGet(MANUAL_MOVES_KEY),{})||{};
       state.autoPlacements=safeParse(storageGet(AUTO_PLACEMENTS_KEY),{})||{};
       state.activeTimer=safeParse(storageGet(TIMER_KEY),null);
@@ -1271,6 +1294,7 @@
       storageSet(TASKS_KEY,JSON.stringify(state.tasks));
       storageSet(SETTINGS_KEY,JSON.stringify(state.settings));
       storageSet(PROGRESS_KEY,JSON.stringify([...state.completedSessions]));
+      storageSet(COMPLETION_LOG_KEY,JSON.stringify(state.completionLog));
       storageSet(MANUAL_MOVES_KEY,JSON.stringify(state.manualMoves));
       storageSet(AUTO_PLACEMENTS_KEY,JSON.stringify(state.autoPlacements));
       storageSet(TIMER_KEY,JSON.stringify(state.activeTimer));
@@ -1308,7 +1332,10 @@
       return state.settings.unavailableBlocks.filter(rule=>rule.block===block&&(rule.recurring?Number(rule.weekday)===date.getDay():rule.date===dateKey(date)));
     }
     function isUnavailable(date,block){return unavailableRulesFor(date,block).length>0}
-    function isSessionDone(key){return state.completedSessions.has(key)}
+    function isSessionDone(key){return String(key||"").startsWith("done:")||state.completedSessions.has(key)}
+    function completionEntriesForInstance(instanceId){return state.completionLog.filter(entry=>entry.instanceId===instanceId)}
+    function completedMinutesForInstance(instanceId){return completionEntriesForInstance(instanceId).reduce((sum,entry)=>sum+Math.max(0,Number(entry.minutes)||0),0)}
+    function completedMinutesForTask(taskId){return state.completionLog.filter(entry=>entry.taskId===taskId).reduce((sum,entry)=>sum+Math.max(0,Number(entry.minutes)||0),0)}
 
     function createDay(date,index){return {date,index,items:[],blocks:{morning:[],afternoon:[],evening:[]},load:0}}
     function recurringDates(task,horizonEnd){
@@ -1326,8 +1353,9 @@
       return dates;
     }
 
-    function splitMinutes(task){
-      const total=Math.max(5,Math.round(task.estimateMinutes));
+    function splitMinutes(task,totalOverride=task.estimateMinutes){
+      const total=Math.max(0,Math.round(Number(totalOverride)||0));
+      if(total<=0)return [];
       if(task.allAtOnce)return [total];
       const target=focusMinutes(task);
       let count=Math.max(1,Math.round(total/target));
@@ -1574,7 +1602,7 @@
 
     function rememberAutomaticPlacements(allItems){
       const next={};
-      for(const item of allItems)if(item.dayIndex!==null)next[item.key]={date:dateKey(state.masterPlan[item.dayIndex].date),block:item.block};
+      for(const item of allItems)if(item.dayIndex!==null&&!isSessionDone(item.key))next[item.key]={date:dateKey(state.masterPlan[item.dayIndex].date),block:item.block};
       state.autoPlacements=next;storageSet(AUTO_PLACEMENTS_KEY,JSON.stringify(next));
     }
 
@@ -1583,25 +1611,68 @@
       state.masterPlan=Array.from({length:horizonDays},(_,index)=>createDay(addDays(start,index),index));
       state.unscheduled=[];state.overtimeMinutes=0;state.instanceKeys=new Map();state.taskProgress=new Map();
       const horizonEnd=state.masterPlan.at(-1).date,instances=[];
+      let progressMigrated=false,taskCompletionChanged=false;
 
-      state.tasks.filter(task=>!task.completed).forEach(task=>{
+      state.tasks.forEach(task=>{
         if(task.recurring){
-          recurringDates(task,horizonEnd).forEach((due,index)=>{
+          if(task.completed)return;
+          recurringDates(task,horizonEnd).forEach(due=>{
             const windowDays=task.frequency==="daily"?0:task.frequency==="weekly"?6:27;
-            instances.push({task,dueDate:due,windowStart:new Date(Math.max(start,addDays(due,-windowDays))),instanceId:`${task.id}-rec-${dateKey(due)}-${index}`,flexible:false});
+            instances.push({task,dueDate:due,windowStart:new Date(Math.max(start,addDays(due,-windowDays))),instanceId:`${task.id}-rec-${dateKey(due)}`,flexible:false});
           });
-        }else if(task.deadline){
-          let due=parseDate(task.deadline);if(due<start)due=start;
-          instances.push({task,dueDate:due,windowStart:start,instanceId:`${task.id}-once`,flexible:false});
-        }else instances.push({task,dueDate:addDays(start,13),windowStart:start,instanceId:`${task.id}-flex`,flexible:true});
+        }else{
+          let due=task.deadline?parseDate(task.deadline):addDays(start,13);
+          if(due<start)due=start;
+          instances.push({task,dueDate:due,windowStart:start,instanceId:`${task.id}-once`,flexible:!task.deadline});
+        }
       });
 
-      const allItems=[];
+      const allItems=[],archiveItems=[];
+      const migrateLegacyProgress=(instance,fullChunks)=>{
+        const exactPrefixes=[`${instance.instanceId}|`];
+        if(!instance.task.recurring)exactPrefixes.push(`${instance.task.id}-flex|`);
+        const recurringPrefix=instance.task.recurring?`${instance.task.id}-rec-${dateKey(instance.dueDate)}-`:"";
+        const matching=[...state.completedSessions].filter(key=>exactPrefixes.some(prefix=>key.startsWith(prefix))||(recurringPrefix&&key.startsWith(recurringPrefix)));
+        if(!matching.length)return;
+        matching.sort((a,b)=>{const ai=Number(a.split("|").at(-2)??a.split("|").at(-1))||0;const bi=Number(b.split("|").at(-2)??b.split("|").at(-1))||0;return ai-bi});
+        matching.forEach((legacyKey,order)=>{
+          const tail=legacyKey.split("|");
+          const parsedIndex=tail.length>=3?Number(tail[tail.length-2]):Number(tail[tail.length-1]);
+          const index=Number.isInteger(parsedIndex)?parsedIndex:order;
+          const minutes=Math.max(1,Math.round(fullChunks[index]||focusMinutes(instance.task)));
+          const placement=state.autoPlacements[legacyKey]||state.manualMoves[legacyKey]||{};
+          state.completionLog.push({id:uid(),instanceId:instance.instanceId,taskId:instance.task.id,minutes,date:placement.date||dateKey(new Date()),block:BLOCKS.includes(placement.block)?placement.block:state.settings.highEnergyBlock,label:sessionLabel(index,Math.max(1,fullChunks.length)),completedAt:new Date().toISOString()});
+          state.completedSessions.delete(legacyKey);delete state.autoPlacements[legacyKey];delete state.manualMoves[legacyKey];progressMigrated=true;
+        });
+      };
+
       for(const instance of instances){
+        const fullChunks=splitMinutes(instance.task);
+        migrateLegacyProgress(instance,fullChunks);
+        if(instance.task.completed&&!instance.task.recurring&&completedMinutesForInstance(instance.instanceId)<=0){
+          state.completionLog.push({id:uid(),instanceId:instance.instanceId,taskId:instance.task.id,minutes:instance.task.estimateMinutes,date:dateKey(new Date()),block:state.settings.highEnergyBlock,label:"Complete",completedAt:new Date().toISOString()});
+          progressMigrated=true;
+        }
+
+        const loggedDone=completedMinutesForInstance(instance.instanceId);
+        const remainingMinutes=Math.max(0,Math.round(instance.task.estimateMinutes-loggedDone));
+        if(!instance.task.recurring){
+          const shouldBeComplete=remainingMinutes<=0;
+          if(instance.task.completed!==shouldBeComplete){instance.task.completed=shouldBeComplete;taskCompletionChanged=true}
+        }
+
+        for(const entry of completionEntriesForInstance(instance.instanceId)){
+          const completedDate=parseDate(entry.date);
+          if(!completedDate)continue;
+          const dayIndex=daysBetween(start,completedDate);
+          if(dayIndex<0||dayIndex>=state.masterPlan.length)continue;
+          archiveItems.push({key:`done:${entry.id}`,instanceId:instance.instanceId,taskId:instance.task.id,task:instance.task,minutes:entry.minutes,label:entry.label||"Done",chunkIndex:-1,chunkCount:0,dueDate:instance.dueDate,flexible:instance.flexible,earliestDayIndex:dayIndex,latestDayIndex:dayIndex,targetDayIndex:dayIndex,targetBlock:entry.block,targetSlotOrdinal:slotOrdinal(dayIndex,entry.block),targetTimelinePosition:blockTimelinePosition(dayIndex,entry.block),priorSlot:{date:entry.date,block:entry.block},block:"",dayIndex:null,pinned:true,isCompleted:true,completedEntryId:entry.id});
+        }
+
         const first=clamp(daysBetween(start,instance.windowStart),0,state.masterPlan.length-1);
         const last=clamp(daysBetween(start,instance.dueDate),0,state.masterPlan.length-1);
-        const chunks=splitMinutes(instance.task),keys=[];
-        chunks.forEach((minutes,index)=>keys.push(`${instance.instanceId}|${index}|${chunks.length}`));
+        const chunks=splitMinutes(instance.task,remainingMinutes),keys=[];
+        chunks.forEach((minutes,index)=>keys.push(`${instance.instanceId}|todo|${index}`));
         state.instanceKeys.set(instance.instanceId,keys);
         const preferredSlots=candidateSlotsForInstance(first,last,instance.task,instance.dueDate);
         chunks.forEach((minutes,index)=>{
@@ -1611,18 +1682,21 @@
             ?preferredSlots.reduce((best,slot)=>Math.abs(slot.capacityCenter-targetCapacity)<Math.abs(best.capacityCenter-targetCapacity)?slot:best,preferredSlots[0])
             :{dayIndex:first,block:"morning",ordinal:slotOrdinal(first,"morning"),timelinePosition:blockTimelinePosition(first,"morning")};
           const key=keys[index],priorSlot=state.autoPlacements[key]||null;
-          allItems.push({key,instanceId:instance.instanceId,taskId:instance.task.id,task:instance.task,minutes,label:sessionLabel(index,chunks.length),chunkIndex:index,chunkCount:chunks.length,dueDate:instance.dueDate,flexible:instance.flexible,earliestDayIndex:first,latestDayIndex:last,targetDayIndex:target.dayIndex,targetBlock:target.block,targetSlotOrdinal:target.ordinal,targetTimelinePosition:target.timelinePosition,priorSlot,block:"",dayIndex:null,pinned:false});
+          allItems.push({key,instanceId:instance.instanceId,taskId:instance.task.id,task:instance.task,minutes,label:sessionLabel(index,chunks.length),chunkIndex:index,chunkCount:chunks.length,dueDate:instance.dueDate,flexible:instance.flexible,earliestDayIndex:first,latestDayIndex:last,targetDayIndex:target.dayIndex,targetBlock:target.block,targetSlotOrdinal:target.ordinal,targetTimelinePosition:target.timelinePosition,priorSlot,block:"",dayIndex:null,pinned:false,isCompleted:false});
         });
+      }
+
+      for(const item of archiveItems){
+        const day=state.masterPlan[item.earliestDayIndex];
+        const block=BLOCKS.includes(item.priorSlot?.block)?item.priorSlot.block:state.settings.highEnergyBlock;
+        placeItem(item,{day,block,pinned:true,archived:true});
       }
 
       const manual=allItems.filter(item=>state.manualMoves[item.key]);
       for(const item of manual){const slot=manualSlotFor(item);if(slot){item.pinned=true;placeItem(item,slot)}else delete state.manualMoves[item.key]}
 
-      const completed=allItems.filter(item=>item.dayIndex===null&&isSessionDone(item.key));
-      for(const item of completed){const slot=completedPriorSlotFor(item);if(slot){item.pinned=true;placeItem(item,slot)}}
-
       const pendingByInstance=new Map();
-      for(const item of allItems.filter(item=>item.dayIndex===null&&!isSessionDone(item.key))){
+      for(const item of allItems.filter(item=>item.dayIndex===null)){
         if(!pendingByInstance.has(item.instanceId))pendingByInstance.set(item.instanceId,[]);
         pendingByInstance.get(item.instanceId).push(item);
       }
@@ -1641,10 +1715,15 @@
       calculateOvertime();rememberAutomaticPlacements(allItems);
 
       state.tasks.forEach(task=>{
-        const allKeys=[];for(const [instanceId,keys] of state.instanceKeys)if(instanceId.startsWith(task.id+"-"))allKeys.push(...keys);
-        const done=allKeys.filter(key=>state.completedSessions.has(key)).length;
-        state.taskProgress.set(task.id,{done,total:allKeys.length});
+        const taskInstances=instances.filter(instance=>instance.task.id===task.id);
+        const totalMinutes=task.recurring?(taskInstances.length?taskInstances.length*task.estimateMinutes:task.completed?task.estimateMinutes:0):task.estimateMinutes;
+        const doneMinutes=taskInstances.length?taskInstances.reduce((sum,instance)=>sum+Math.min(task.estimateMinutes,completedMinutesForInstance(instance.instanceId)),0):(task.completed?totalMinutes:0);
+        const doneBlocks=state.completionLog.filter(entry=>entry.taskId===task.id&&taskInstances.some(instance=>instance.instanceId===entry.instanceId)).length;
+        const pendingBlocks=allItems.filter(item=>item.taskId===task.id).length;
+        state.taskProgress.set(task.id,{done:doneBlocks,total:doneBlocks+pendingBlocks,doneMinutes,totalMinutes});
       });
+
+      if(progressMigrated||taskCompletionChanged){persistLocal(true);queueCloudSave()}
     }
 
     function currentWeekDays(){const start=state.weekOffset*7;return state.masterPlan.slice(start,start+7)}
@@ -1733,7 +1812,10 @@
 
     function planItemHtml(item){
       const done=isSessionDone(item.key);
-      return `<div class="plan-item ${done?"done":""}"><div class="plan-item-title">${escapeHtml(item.task.name)}</div><div class="plan-item-meta"><span>${item.label} · ${formatMinutes(item.minutes)}</span><span class="plan-item-buttons"><button class="plan-item-btn" data-action="complete" data-key="${item.key}" title="Done">${done?"✓":"○"}</button><button class="plan-item-btn" data-action="start" data-key="${item.key}" title="Start">▶</button><button class="plan-item-btn" data-action="move" data-key="${item.key}" title="Move">↗</button></span></div></div>`;
+      const buttons=done
+        ?`<button class="plan-item-btn" data-action="complete" data-key="${item.key}" title="Undo completed block">✓</button>`
+        :`<button class="plan-item-btn" data-action="complete" data-key="${item.key}" title="Done">○</button><button class="plan-item-btn" data-action="start" data-key="${item.key}" title="Start">▶</button><button class="plan-item-btn" data-action="move" data-key="${item.key}" title="Move">↗</button>`;
+      return `<div class="plan-item ${done?"done":""}"><div class="plan-item-title">${escapeHtml(item.task.name)}</div><div class="plan-item-meta"><span>${item.label} · ${formatMinutes(item.minutes)}</span><span class="plan-item-buttons">${buttons}</span></div></div>`;
     }
 
     function renderPlan(){
@@ -1759,8 +1841,12 @@
       const shown=state.tasks.filter(task=>state.taskFilter==="all"||state.taskFilter==="active"&&!task.completed||state.taskFilter==="completed"&&task.completed).sort((a,b)=>Number(a.completed)-Number(b.completed)||(parseDate(a.deadline)||new Date(8640000000000000))-(parseDate(b.deadline)||new Date(8640000000000000)));
       if(!shown.length){$("taskList").innerHTML=`<div class="empty-state"><h3>${state.taskFilter==="completed"?"No completed tasks yet":"No tasks here"}</h3><p>${state.taskFilter==="completed"?"Completed tasks will appear here.":"Add a task and Task-it-up will build the plan."}</p>${state.taskFilter!=="completed"?`<button class="btn btn-primary" data-action="add">Add a task</button>`:""}</div>`;return}
       $("taskList").innerHTML=shown.map(task=>{
-        const progress=state.taskProgress.get(task.id)||{done:0,total:0};const percent=task.completed?100:progress.total?Math.round(progress.done/progress.total*100):0;
-        return `<div class="task-card ${task.completed?"completed":""}"><div class="task-card-main"><h3>${escapeHtml(task.name)}</h3><div class="task-card-meta"><span class="pill">${formatMinutes(task.estimateMinutes)}</span>${task.deadline?`<span class="pill">Due ${formatDate(parseDate(task.deadline),{month:"short",day:"numeric"})}</span>`:`<span class="pill">Flexible</span>`}${task.category?`<span class="pill">${escapeHtml(task.category)}</span>`:""}${task.recurring?`<span class="pill">Repeats ${task.frequency}</span>`:""}</div><div class="task-progress"><div class="task-progress-copy"><span>${task.completed?"Complete":`${progress.done} of ${progress.total} focus blocks`}</span><span>${percent}%</span></div><div class="task-progress-track"><div class="task-progress-fill" style="width:${percent}%"></div></div></div></div><div class="task-card-actions"><button class="round-action" data-action="toggle-task" data-id="${task.id}" title="${task.completed?"Reopen":"Complete task"}">${task.completed?"↺":"✓"}</button><button class="round-action" data-action="edit" data-id="${task.id}" title="Edit">✎</button><button class="round-action" data-action="delete" data-id="${task.id}" title="Delete">×</button></div></div>`;
+        const progress=state.taskProgress.get(task.id)||{done:0,total:0,doneMinutes:0,totalMinutes:task.estimateMinutes};
+        const totalMinutes=Math.max(0,Number(progress.totalMinutes)||task.estimateMinutes);
+        const doneMinutes=Math.min(totalMinutes,Math.max(0,Number(progress.doneMinutes)||0));
+        const percent=task.completed?100:totalMinutes?Math.round(doneMinutes/totalMinutes*100):0;
+        const progressCopy=task.completed?`Complete · ${formatMinutes(doneMinutes)} checked off`:`${formatMinutes(doneMinutes)} of ${formatMinutes(totalMinutes)} checked off${progress.total?` · ${progress.total-progress.done} blocks left`:""}`;
+        return `<div class="task-card ${task.completed?"completed":""}"><div class="task-card-main"><h3>${escapeHtml(task.name)}</h3><div class="task-card-meta"><span class="pill">${formatMinutes(task.estimateMinutes)}</span>${task.deadline?`<span class="pill">Due ${formatDate(parseDate(task.deadline),{month:"short",day:"numeric"})}</span>`:`<span class="pill">Flexible</span>`}${task.category?`<span class="pill">${escapeHtml(task.category)}</span>`:""}${task.recurring?`<span class="pill">Repeats ${task.frequency}</span>`:""}</div><div class="task-progress"><div class="task-progress-copy"><span>${progressCopy}</span><span>${percent}%</span></div><div class="task-progress-track"><div class="task-progress-fill" style="width:${percent}%"></div></div></div></div><div class="task-card-actions"><button class="round-action" data-action="toggle-task" data-id="${task.id}" title="${task.completed?"Reopen":"Complete task"}">${task.completed?"↺":"✓"}</button><button class="round-action" data-action="edit" data-id="${task.id}" title="Edit">✎</button><button class="round-action" data-action="delete" data-id="${task.id}" title="Delete">×</button></div></div>`;
       }).join("");
     }
 
@@ -1770,15 +1856,18 @@
       return rules.map(rule=>`<div class="unavailable-row"><div><strong>${rule.recurring?`${formatWeekday(rule.weekday)}s`:formatDate(parseDate(rule.date),{month:"short",day:"numeric",year:"numeric"})} · ${BLOCK_LABELS[rule.block]}</strong><span>${rule.recurring?"Repeats weekly":"One time"}</span></div><button class="round-action" data-action="delete-unavailable" data-id="${rule.id}" title="Remove unavailable block" aria-label="Remove unavailable block">×</button></div>`).join("");
     }
 
-    function renderSettings(){
-      for(const block of BLOCKS){$(block+"Start").value=state.settings.blockTimes[block].start;$(block+"End").value=state.settings.blockTimes[block].end}
-      $("highEnergyBlock").value=state.settings.highEnergyBlock;
-      $("timerSound").value=state.settings.timerSound||"gentle";
-      $("backgroundNoise").value=state.settings.backgroundNoise||"none";
+    function renderSettings({preserveInputs=false}={}){
+      if(!preserveInputs){
+        for(const block of BLOCKS){$(block+"Start").value=state.settings.blockTimes[block].start;$(block+"End").value=state.settings.blockTimes[block].end}
+        $("highEnergyBlock").value=state.settings.highEnergyBlock;
+        $("timerSound").value=state.settings.timerSound||"gentle";
+        $("backgroundNoise").value=state.settings.backgroundNoise||"none";
+        $("autoStartBreak").checked=Boolean(state.settings.autoStartBreak);
+      }
       $("planUnavailableList").innerHTML=unavailableListHtml("No unavailable blocks yet.");
     }
 
-    function renderAll(){buildPlan();renderHeader();renderToday();renderPlan();renderTasks();renderSettings();renderTimer()}
+    function renderAll(){buildPlan();renderHeader();renderToday();renderPlan();renderTasks();renderSettings({preserveInputs:$("settingsDrawer").classList.contains("open")});renderTimer()}
 
     function escapeHtml(value){return String(value??"").replace(/[&<>'"]/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[char]))}
     function formatWeekday(day){return ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][Number(day)]}
@@ -1838,18 +1927,41 @@
     function saveTask(event){
       event.preventDefault();const name=$("taskName").value.trim();if(!name){setWizardStep(1);showToast("Add a task name");return}
       const id=$("editingTaskId").value;const current=state.tasks.find(task=>task.id===id);
-      const task={id:id||uid(),name,notes:$("taskNotes").value.trim(),category:$("taskCategory").value.trim(),estimateMinutes:estimateMinutesFromInput(),deadline:chosenDeadline(),deadlineBlock:"",feeling:state.wizardFeeling,recurring:$("taskRecurring").checked,frequency:$("taskFrequency").value,weekday:Number($("taskWeekday").value),repeatUntil:$("taskRepeatUntil").value,allAtOnce:$("keepTogetherSwitch").checked||state.wizardSplit==="together",completed:current?.completed||false,createdAt:current?.createdAt||new Date().toISOString()};
+      const recurring=$("taskRecurring").checked;
+      const task={id:id||uid(),name,notes:$("taskNotes").value.trim(),category:$("taskCategory").value.trim(),estimateMinutes:estimateMinutesFromInput(),deadline:chosenDeadline(),deadlineBlock:"",feeling:state.wizardFeeling,recurring,frequency:$("taskFrequency").value,weekday:Number($("taskWeekday").value),repeatUntil:$("taskRepeatUntil").value,allAtOnce:$("keepTogetherSwitch").checked||state.wizardSplit==="together",completed:recurring?Boolean(current?.completed):false,createdAt:current?.createdAt||new Date().toISOString()};
       if(current)state.tasks[state.tasks.findIndex(item=>item.id===id)]=task;else state.tasks.push(task);
       persist();closeTaskModal();renderAll();switchView("todayView");showToast(current?"Task updated":"Task added to your plan");
     }
 
     function findItem(key){for(const day of state.masterPlan){const item=day.items.find(entry=>entry.key===key);if(item)return {day,item}}return null}
-    function toggleSession(key){
-      const located=findItem(key);if(state.completedSessions.has(key)){state.completedSessions.delete(key);if(located){const task=state.tasks.find(t=>t.id===located.item.taskId);if(task)task.completed=false}}else{state.completedSessions.add(key);if(located&&!located.item.task.recurring){const keys=state.instanceKeys.get(located.item.instanceId)||[];if(keys.length&&keys.every(itemKey=>state.completedSessions.has(itemKey))){const task=state.tasks.find(t=>t.id===located.item.taskId);if(task)task.completed=true}}}
-      persist();renderAll();
+    function toggleSession(key,{save=true,render=true}={}){
+      const located=findItem(key);if(!located)return false;
+      const {day,item}=located;
+      if(item.isCompleted||String(key).startsWith("done:")){
+        const entryId=item.completedEntryId||String(key).slice(5);
+        state.completionLog=state.completionLog.filter(entry=>entry.id!==entryId);
+        const task=state.tasks.find(t=>t.id===item.taskId);if(task)task.completed=false;
+      }else{
+        state.completionLog.push({id:uid(),instanceId:item.instanceId,taskId:item.taskId,minutes:item.minutes,date:dateKey(day.date),block:item.block,label:item.label,completedAt:new Date().toISOString()});
+        delete state.manualMoves[item.key];delete state.autoPlacements[item.key];
+      }
+      if(save)persist();if(render)renderAll();return true;
     }
-    function toggleTask(taskId){const task=state.tasks.find(item=>item.id===taskId);if(!task)return;task.completed=!task.completed;if(!task.completed){for(const key of [...state.completedSessions])if(key.startsWith(task.id+"-"))state.completedSessions.delete(key)}persist();renderAll();showToast(task.completed?"Task completed":"Task reopened")}
-    function deleteTask(taskId){const task=state.tasks.find(item=>item.id===taskId);if(!task)return;if(!confirm(`Delete “${task.name}”?`))return;state.tasks=state.tasks.filter(item=>item.id!==taskId);for(const key of [...state.completedSessions])if(key.startsWith(taskId+"-"))state.completedSessions.delete(key);Object.keys(state.manualMoves).forEach(key=>{if(key.startsWith(taskId+"-"))delete state.manualMoves[key]});Object.keys(state.autoPlacements).forEach(key=>{if(key.startsWith(taskId+"-"))delete state.autoPlacements[key]});persist();renderAll();showToast("Task deleted")}
+    function toggleTask(taskId){
+      const task=state.tasks.find(item=>item.id===taskId);if(!task)return;
+      if(task.completed){
+        task.completed=false;state.completionLog=state.completionLog.filter(entry=>entry.taskId!==taskId);
+        for(const key of [...state.completedSessions])if(key.startsWith(task.id+"-"))state.completedSessions.delete(key);
+        persist();renderAll();showToast("Task reopened");return;
+      }
+      if(task.recurring){task.completed=true}else{
+        const instanceId=`${task.id}-once`;const alreadyDone=completedMinutesForInstance(instanceId);const remaining=Math.max(0,task.estimateMinutes-alreadyDone);
+        if(remaining>0)state.completionLog.push({id:uid(),instanceId,taskId:task.id,minutes:remaining,date:dateKey(new Date()),block:state.settings.highEnergyBlock,label:"Complete",completedAt:new Date().toISOString()});
+        task.completed=true;
+      }
+      persist();renderAll();showToast("Task completed");
+    }
+    function deleteTask(taskId){const task=state.tasks.find(item=>item.id===taskId);if(!task)return;if(!confirm(`Delete “${task.name}”?`))return;state.tasks=state.tasks.filter(item=>item.id!==taskId);state.completionLog=state.completionLog.filter(entry=>entry.taskId!==taskId);for(const key of [...state.completedSessions])if(key.startsWith(taskId+"-"))state.completedSessions.delete(key);Object.keys(state.manualMoves).forEach(key=>{if(key.startsWith(taskId+"-"))delete state.manualMoves[key]});Object.keys(state.autoPlacements).forEach(key=>{if(key.startsWith(taskId+"-"))delete state.autoPlacements[key]});persist();renderAll();showToast("Task deleted")}
 
     function openMove(key){const located=findItem(key);if(!located)return;state.activeMoveKey=key;$("moveDate").min=dateKey(new Date());$("moveDate").value=dateKey(addDays(located.day.date,located.day.index===0?1:0));$("moveBlock").value=located.item.block||"morning";$("moveBackdrop").classList.remove("hidden");$("moveModal").classList.remove("hidden");document.body.style.overflow="hidden"}
     function closeMove(){state.activeMoveKey=null;$("moveBackdrop").classList.add("hidden");$("moveModal").classList.add("hidden");document.body.style.overflow=""}
@@ -1896,7 +2008,7 @@
       const timerMinutes=starterMinutes?Math.min(starterMinutes,plannedMinutes):plannedMinutes;
       const totalSeconds=Math.max(60,timerMinutes*60);
       state.todayNudgeKey=null;
-      state.activeTimer={key,taskName:located.item.task.name,label:located.item.label,minutes:timerMinutes,plannedMinutes,totalSeconds,remainingSeconds:totalSeconds,running:true,starterMode:Boolean(starterMinutes&&timerMinutes<plannedMinutes),updatedAt:Date.now()};
+      state.activeTimer={mode:"focus",key,taskName:located.item.task.name,label:located.item.label,minutes:timerMinutes,plannedMinutes,totalSeconds,remainingSeconds:totalSeconds,running:true,starterMode:Boolean(starterMinutes&&timerMinutes<plannedMinutes),updatedAt:Date.now()};
       persist();openFocusOverlay();
     }
     function resumeTimer(){
@@ -1909,21 +2021,24 @@
         const timer=state.activeTimer;if(!timer||!timer.running)return;
         const now=Date.now();const elapsed=Math.max(1,Math.floor((now-(timer.updatedAt||now))/1000));
         timer.remainingSeconds=Math.max(0,timer.remainingSeconds-elapsed);timer.updatedAt=now;
-        if(timer.remainingSeconds<=0){timer.running=false;stopBackgroundNoise();playTimerSound();showToast(timer.starterMode?"Five minutes done. Continue if you can.":"Focus time complete")}
+        if(timer.remainingSeconds<=0){timer.running=false;stopBackgroundNoise();playTimerSound();showToast(timer.mode==="break"?"Break complete":timer.starterMode?"Five minutes done. Continue if you can.":"Focus time complete")}
         renderTimer();if(timer.remainingSeconds%10===0)persistLocal(true);
       },1000)
     }
     function renderTimer(){
       const timer=state.activeTimer;if(!timer)return;
-      const plannedMinutes=Number(timer.plannedMinutes||timer.minutes||0);
-      $("focusTaskName").textContent=timer.taskName;
-      $("focusSessionMeta").textContent=timer.starterMode?`A ${formatMinutes(timer.minutes)} start · ${formatMinutes(plannedMinutes)} planned`:`${timer.label} · ${formatMinutes(plannedMinutes)}`;
+      const isBreak=timer.mode==="break";const plannedMinutes=Number(timer.plannedMinutes||timer.minutes||0);
+      $("focusKicker").textContent=isBreak?"Break":"Focus";
+      $("focusTaskName").textContent=isBreak?"Take a breath":timer.taskName;
+      $("focusSessionMeta").textContent=isBreak?"A 5-minute break before the next focus block":timer.starterMode?`A ${formatMinutes(timer.minutes)} start · ${formatMinutes(plannedMinutes)} planned`:`${timer.label} · ${formatMinutes(plannedMinutes)}`;
       const seconds=Math.max(0,Math.round(timer.remainingSeconds));
       $("timerTime").textContent=`${String(Math.floor(seconds/60)).padStart(2,"0")}:${String(seconds%60).padStart(2,"0")}`;
       const elapsed=timer.totalSeconds-seconds;const degrees=clamp(elapsed/Math.max(1,timer.totalSeconds)*360,0,360);
       $("timerRing").style.setProperty("--timer-progress",degrees+"deg");
-      $("pauseTimerButton").textContent=timer.running?"Pause":"Continue";
-      $("finishSessionButton").textContent=timer.starterMode?"Continue the full block":"Mark session done";
+      $("pauseTimerButton").classList.toggle("hidden",isBreak&&seconds<=0);
+      $("pauseTimerButton").textContent=isBreak?(timer.running?"Pause break":"Start break"):(timer.running?"Pause":"Continue");
+      $("finishSessionButton").textContent=isBreak?(seconds<=0?"Done":timer.running?"End break":"Skip break"):timer.starterMode?"Continue the full block":"Mark session done";
+      $("resetTimerButton").textContent=isBreak?"Restart break":"Restart";
     }
     function toggleTimer(){
       if(!state.activeTimer)return;
@@ -1942,15 +2057,23 @@
       timer.minutes=Number(timer.plannedMinutes||timer.minutes||1);timer.totalSeconds=remaining;timer.remainingSeconds=remaining;timer.starterMode=false;timer.running=true;timer.updatedAt=Date.now();
       persist();renderTimer();startTimerTicker();startBackgroundNoise();
     }
-    function focusSecondaryAction(){if(state.activeTimer?.starterMode)continueFullBlock();else finishTimerSession()}
+    function focusSecondaryAction(){if(state.activeTimer?.mode==="break")finishBreak();else if(state.activeTimer?.starterMode)continueFullBlock();else finishTimerSession()}
+    function beginBreakTimer(autoStart=false){
+      const totalSeconds=5*60;state.activeTimer={mode:"break",key:null,taskName:"Take a breath",label:"Break",minutes:5,plannedMinutes:5,totalSeconds,remainingSeconds:totalSeconds,running:Boolean(autoStart),starterMode:false,updatedAt:Date.now()};
+      stopBackgroundNoise();renderTimer();if(autoStart)startTimerTicker();
+    }
     function finishTimerSession(){
-      if(!state.activeTimer)return;
-      const key=state.activeTimer.key;if(!state.completedSessions.has(key))toggleSession(key);
-      stopBackgroundNoise();state.activeTimer=null;persist();closeFocus();showToast("Focus block completed");
+      if(!state.activeTimer||state.activeTimer.mode==="break")return;
+      const key=state.activeTimer.key;toggleSession(key,{save:false,render:false});
+      const autoStart=Boolean(state.settings.autoStartBreak);beginBreakTimer(autoStart);persist();renderAll();openFocusOverlay();showToast(autoStart?"Focus block completed. Break started.":"Focus block completed. Start a 5-minute break when ready.");
+    }
+    function finishBreak(){
+      clearInterval(state.timerTicker);stopBackgroundNoise();state.activeTimer=null;persist();$("focusOverlay").classList.add("hidden");document.body.style.overflow="";renderAll();showToast("Break finished");
     }
     function closeFocus(){
       clearInterval(state.timerTicker);stopBackgroundNoise();
-      if(state.activeTimer){restoreTimerElapsed();state.activeTimer.running=false;state.activeTimer.updatedAt=Date.now();state.todaySuggestionKey=state.activeTimer.key}
+      if(state.activeTimer?.mode==="break")state.activeTimer=null;
+      else if(state.activeTimer){restoreTimerElapsed();state.activeTimer.running=false;state.activeTimer.updatedAt=Date.now();state.todaySuggestionKey=state.activeTimer.key}
       $("focusOverlay").classList.add("hidden");document.body.style.overflow="";persistLocal(true);renderToday();
     }
     function ensureAudio(){
@@ -1984,7 +2107,7 @@
     function startBackgroundNoise(){
       stopBackgroundNoise();
       const kind=state.settings.backgroundNoise||"none";
-      if(kind==="none"||!state.activeTimer?.running)return;
+      if(kind==="none"||!state.activeTimer?.running||state.activeTimer?.mode==="break")return;
       try{
         const ctx=ensureAudio();const master=ctx.createGain();master.gain.value=.12;master.connect(ctx.destination);
         const ambient={nodes:[master],timers:[],intervals:[]};state.ambient=ambient;
@@ -2042,8 +2165,19 @@
       }catch(error){console.warn("Background sound unavailable",error);stopBackgroundNoise()}
     }
     function playTimerSound(){
-      if(state.settings.timerSound==="none")return;
-      try{const ctx=ensureAudio();const gain=ctx.createGain(),osc=ctx.createOscillator();osc.connect(gain);gain.connect(ctx.destination);osc.frequency.value=state.settings.timerSound==="bell"?720:520;gain.gain.setValueAtTime(.0001,ctx.currentTime);gain.gain.exponentialRampToValueAtTime(.18,ctx.currentTime+.02);gain.gain.exponentialRampToValueAtTime(.0001,ctx.currentTime+.75);osc.start();osc.stop(ctx.currentTime+.8)}catch(error){console.warn(error)}
+      const sound=state.settings.timerSound||"gentle";if(sound==="none")return;
+      try{
+        const ctx=ensureAudio();const now=ctx.currentTime;
+        const tone=(frequency,start,duration=.45,volume=.14,type="sine",endFrequency=null)=>{
+          const gain=ctx.createGain(),osc=ctx.createOscillator();osc.type=type;osc.frequency.setValueAtTime(frequency,now+start);if(endFrequency)osc.frequency.exponentialRampToValueAtTime(endFrequency,now+start+duration);osc.connect(gain);gain.connect(ctx.destination);gain.gain.setValueAtTime(.0001,now+start);gain.gain.exponentialRampToValueAtTime(volume,now+start+.02);gain.gain.exponentialRampToValueAtTime(.0001,now+start+duration);osc.start(now+start);osc.stop(now+start+duration+.03);
+        };
+        if(sound==="bell"){tone(760,0,.85,.17,"sine",520);tone(1520,0,.55,.055,"sine",1040)}
+        else if(sound==="double"){tone(620,0,.42,.14);tone(820,.48,.55,.15)}
+        else if(sound==="gong"){tone(220,0,1.45,.16,"sine",165);tone(440,0,1.05,.07,"sine",330);tone(660,.03,.72,.035)}
+        else if(sound==="birds"){tone(980,0,.22,.09,"sine",1420);tone(1240,.24,.2,.08,"sine",1760);tone(1080,.52,.28,.075,"sine",1580)}
+        else if(sound==="digital"){tone(880,0,.16,.12,"square");tone(880,.22,.16,.12,"square");tone(1175,.44,.25,.12,"square")}
+        else{tone(520,0,.72,.14,"sine",660);tone(780,.18,.7,.07,"sine",920)}
+      }catch(error){console.warn(error)}
     }
 
     function setUnavailableMode(mode){
@@ -2093,7 +2227,7 @@
       persist();renderAll();showToast(`${formatDate(date,{weekday:"short",month:"short",day:"numeric"})} ${BLOCK_LABELS[block].toLowerCase()} marked unavailable`);
     }
 
-    function openSettings(){$("settingsBackdrop").classList.add("open");$("settingsDrawer").classList.add("open");document.body.style.overflow="hidden"}
+    function openSettings(){renderSettings();$("settingsBackdrop").classList.add("open");$("settingsDrawer").classList.add("open");document.body.style.overflow="hidden"}
     function closeSettings(){$("settingsBackdrop").classList.remove("open");$("settingsDrawer").classList.remove("open");document.body.style.overflow=""}
     function readWorkBoundaries(){
       const next={};
@@ -2121,8 +2255,10 @@
       state.settings.highEnergyBlock=$("highEnergyBlock").value;
       state.settings.timerSound=$("timerSound").value;
       state.settings.backgroundNoise=$("backgroundNoise").value;
+      state.settings.autoStartBreak=$("autoStartBreak").checked;
       persist();renderAll();
       if(state.activeTimer?.running)startBackgroundNoise();else stopBackgroundNoise();
+      showToast("Settings saved");
     }
     function addUnavailable(){const date=$("unavailableDate").value,block=$("unavailableBlock").value,recurring=$("unavailableRecurring").checked;if(!date){showToast("Choose a date");return}const parsed=parseDate(date),weekday=parsed.getDay();if(unavailableRuleExists({date,block,recurring,weekday})){showToast("That unavailable block already exists");return}state.settings.unavailableBlocks.push({id:uid(),date:recurring?"":date,block,recurring,weekday});persist();renderAll();showToast(recurring?`Blocked every ${formatWeekday(weekday)} ${BLOCK_LABELS[block].toLowerCase()}`:"Unavailable time added")}
     function deleteUnavailable(id){state.settings.unavailableBlocks=state.settings.unavailableBlocks.filter(rule=>rule.id!==id);persist();renderAll()}
@@ -2133,11 +2269,11 @@
     }
 
     function setCloudStatus(message){$("cloudStatus").textContent=message}
-    function hasMeaningfulLocalState(){return Boolean(state.tasks.length||state.completedSessions.size||Object.keys(state.manualMoves).length||Object.keys(state.autoPlacements).length)}
-    function serializeCloudState(){return {schemaVersion:2,tasks:state.tasks,settings:state.settings,completedPlanKeys:[...state.completedSessions],manualMoves:state.manualMoves,autoPlacements:state.autoPlacements,activeTimer:state.activeTimer,clientUpdatedAt:state.localRevisionAt||Date.now()}}
+    function hasMeaningfulLocalState(){return Boolean(state.tasks.length||state.completedSessions.size||state.completionLog.length||Object.keys(state.manualMoves).length||Object.keys(state.autoPlacements).length)}
+    function serializeCloudState(){return {schemaVersion:3,tasks:state.tasks,settings:state.settings,completedPlanKeys:[...state.completedSessions],completionLog:state.completionLog,manualMoves:state.manualMoves,autoPlacements:state.autoPlacements,activeTimer:state.activeTimer,clientUpdatedAt:state.localRevisionAt||Date.now()}}
     function applyCloudState(data){
       if(!data||typeof data!=="object")return;state.applyingCloudState=true;
-      try{const cloudSettings=mergeSettings(data.settings||{});state.settings=cloudSettings;state.tasks=(Array.isArray(data.tasks)?data.tasks:[]).map(task=>normalizeTask(task,data.settings||{}));state.completedSessions=new Set(Array.isArray(data.completedPlanKeys)?data.completedPlanKeys:[]);state.manualMoves=data.manualMoves&&typeof data.manualMoves==="object"?data.manualMoves:{};state.autoPlacements=data.autoPlacements&&typeof data.autoPlacements==="object"?data.autoPlacements:{};state.activeTimer=data.activeTimer||null;state.localRevisionAt=Number(data.clientUpdatedAt)||Date.now();storageSet(CLOUD_LOCAL_REVISION_KEY,String(state.localRevisionAt));restoreTimerElapsed();if(state.activeTimer){state.activeTimer.running=false;state.activeTimer.updatedAt=Date.now();state.todaySuggestionKey=state.activeTimer.key}persistLocal(false);renderAll()}finally{state.applyingCloudState=false}
+      try{const cloudSettings=mergeSettings(data.settings||{});state.settings=cloudSettings;state.tasks=(Array.isArray(data.tasks)?data.tasks:[]).map(task=>normalizeTask(task,data.settings||{}));state.completedSessions=new Set(Array.isArray(data.completedPlanKeys)?data.completedPlanKeys:[]);state.completionLog=(Array.isArray(data.completionLog)?data.completionLog:[]).filter(entry=>entry&&entry.id&&entry.instanceId&&entry.taskId&&Number(entry.minutes)>0).map(entry=>({id:String(entry.id),instanceId:String(entry.instanceId),taskId:String(entry.taskId),minutes:Math.max(1,Math.round(Number(entry.minutes))),date:entry.date||dateKey(new Date()),block:BLOCKS.includes(entry.block)?entry.block:"morning",label:String(entry.label||"Done"),completedAt:entry.completedAt||new Date().toISOString()}));state.manualMoves=data.manualMoves&&typeof data.manualMoves==="object"?data.manualMoves:{};state.autoPlacements=data.autoPlacements&&typeof data.autoPlacements==="object"?data.autoPlacements:{};state.activeTimer=data.activeTimer||null;state.localRevisionAt=Number(data.clientUpdatedAt)||Date.now();storageSet(CLOUD_LOCAL_REVISION_KEY,String(state.localRevisionAt));restoreTimerElapsed();if(state.activeTimer){state.activeTimer.running=false;state.activeTimer.updatedAt=Date.now();state.todaySuggestionKey=state.activeTimer.key}persistLocal(false);renderAll()}finally{state.applyingCloudState=false}
     }
     function cloudDoc(uidValue){return state.firebaseFunctions.doc(state.firebaseDb,"taskItUpUsers",uidValue,"data","appState")}
     async function saveCloudNow(){
@@ -2192,8 +2328,8 @@
       $("closeUnavailableModal").addEventListener("click",closeUnavailableModal);$("unavailableBackdrop").addEventListener("click",closeUnavailableModal);$("confirmUnavailableButton").addEventListener("click",addUnavailableFromPlan);document.querySelectorAll("[data-unavailable-mode]").forEach(button=>button.addEventListener("click",()=>setUnavailableMode(button.dataset.unavailableMode)));
       $("pauseTimerButton").addEventListener("click",toggleTimer);$("resetTimerButton").addEventListener("click",resetTimer);$("finishSessionButton").addEventListener("click",focusSecondaryAction);$("closeFocusButton").addEventListener("click",closeFocus);
 
-      $("settingsButton").addEventListener("click",openSettings);$("closeSettingsButton").addEventListener("click",closeSettings);$("settingsBackdrop").addEventListener("click",closeSettings);["morningStart","morningEnd","afternoonStart","afternoonEnd","eveningStart","eveningEnd","highEnergyBlock","timerSound","backgroundNoise"].forEach(id=>$(id).addEventListener("change",saveAvailability));
-      $("clearAllButton").addEventListener("click",()=>{if(!confirm("Delete all tasks and plan progress?"))return;stopBackgroundNoise();state.tasks=[];state.completedSessions.clear();state.manualMoves={};state.autoPlacements={};state.activeTimer=null;persist();renderAll();closeSettings();showToast("All tasks cleared")});
+      $("settingsButton").addEventListener("click",openSettings);$("closeSettingsButton").addEventListener("click",closeSettings);$("settingsBackdrop").addEventListener("click",closeSettings);$("saveSettingsButton").addEventListener("click",saveAvailability);
+      $("clearAllButton").addEventListener("click",()=>{if(!confirm("Delete all tasks and plan progress?"))return;stopBackgroundNoise();state.tasks=[];state.completedSessions.clear();state.completionLog=[];state.manualMoves={};state.autoPlacements={};state.activeTimer=null;persist();renderAll();closeSettings();showToast("All tasks cleared")});
       document.addEventListener("keydown",event=>{if(event.key!=="Escape")return;if(!$("taskModal").classList.contains("hidden"))closeTaskModal();else if(!$("moveModal").classList.contains("hidden"))closeMove();else if(!$("unavailableModal").classList.contains("hidden"))closeUnavailableModal();else if(!$("adjustModal").classList.contains("hidden"))closeAdjust();else if($("settingsDrawer").classList.contains("open"))closeSettings()});
     }
 
