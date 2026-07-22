@@ -4,9 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#6f8798" />
-  <title>Task-it-up</title>
+  <title>Evenly</title>
   <!-- Scheduler: least-slack-first + cost-based placement + local-search balancing -->
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%232f6f68'/%3E%3Cpath d='M18 33l9 9 20-23' fill='none' stroke='white' stroke-width='7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Crect width='128' height='128' rx='28' fill='%23fffefa'/%3E%3Cpath d='M35 44c9-18 49-18 58 0' fill='none' stroke='%2386a293' stroke-width='9' stroke-linecap='round'/%3E%3Cpath d='M37 84c9 18 45 18 54 0' fill='none' stroke='%239992b4' stroke-width='9' stroke-linecap='round'/%3E%3Cpath d='M48 56h32' stroke='%2386a293' stroke-width='9' stroke-linecap='round'/%3E%3Cpath d='M46 69h36' stroke='%236f8798' stroke-width='9' stroke-linecap='round'/%3E%3Cpath d='M48 82h32' stroke='%239992b4' stroke-width='9' stroke-linecap='round' opacity='.0001'/%3E%3C/svg%3E" />
   <style>
     :root{
       --bg:#f3f7f4;
@@ -870,15 +870,57 @@
     }
   </style>
 
+
+  <style id="evenly-brand-and-worklog">
+    .brand{min-width:0;align-items:center}
+    .brand-lockup{display:flex;align-items:center;gap:12px;min-width:0}
+    .brand-symbol{width:44px;height:44px;flex:0 0 auto;display:block}
+    .brand-wording{display:flex;flex-direction:column;gap:2px;min-width:0}
+    .brand h1{margin:0;font-size:1.55rem;letter-spacing:-.035em;color:#2f3740;text-transform:lowercase}
+    .brand-tagline{font-size:.68rem;letter-spacing:.04em;color:var(--muted);white-space:nowrap}
+    .brand-date{margin-top:2px;color:var(--muted);font-size:.76rem}
+    .brand-mark{display:none!important}
+
+    .completed-panel.hidden{display:none}
+    .work-log{display:grid;gap:10px}
+    .work-log-entry{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;padding:13px 0;border-bottom:1px solid var(--line)}
+    .work-log-entry:last-child{border-bottom:0}
+    .work-log-time{font-size:.74rem;color:var(--muted);min-width:68px}
+    .work-log-main{min-width:0}
+    .work-log-title{font-size:.96rem;color:#39434b}
+    .work-log-meta{font-size:.74rem;color:var(--muted);margin-top:4px}
+    .work-log-empty{padding:8px 0 2px;color:var(--muted);font-size:.9rem;line-height:1.5}
+
+    @media(max-width:720px){
+      .brand-lockup{gap:10px}
+      .brand-symbol{width:38px;height:38px}
+      .brand h1{font-size:1.22rem}
+      .brand-tagline{display:none}
+      .brand-date{font-size:.72rem}
+      .work-log-entry{grid-template-columns:1fr auto;gap:8px}
+      .work-log-time{grid-column:1;min-width:0}
+      .work-log-main{grid-column:1}
+    }
+  </style>
+
 </head>
 <body>
   <div class="app">
     <header class="topbar">
       <div class="brand">
-        <div class="brand-mark">✓</div>
-        <div>
-          <h1>Task-it-up</h1>
-          <div class="brand-date" id="headerDate"></div>
+        <div class="brand-lockup" aria-label="Evenly">
+          <svg class="brand-symbol" viewBox="0 0 128 128" role="img" aria-hidden="true">
+            <path d="M35 36c8-15 50-15 58 0" fill="none" stroke="#86a293" stroke-width="9" stroke-linecap="round"/>
+            <path d="M39 88c8 15 42 15 50 0" fill="none" stroke="#9992b4" stroke-width="9" stroke-linecap="round"/>
+            <path d="M51 51h26" fill="none" stroke="#86a293" stroke-width="9" stroke-linecap="round"/>
+            <path d="M47 64h34" fill="none" stroke="#6f8798" stroke-width="9" stroke-linecap="round"/>
+            <path d="M51 77h26" fill="none" stroke="#9992b4" stroke-width="9" stroke-linecap="round"/>
+          </svg>
+          <div class="brand-wording">
+            <h1>evenly</h1>
+            <div class="brand-tagline">balance • focus • get things done</div>
+            <div class="brand-date" id="headerDate"></div>
+          </div>
         </div>
       </div>
       <div class="top-actions">
@@ -919,6 +961,11 @@
             <div class="panel section-panel">
               <div class="section-head"><h3>Later today</h3><span id="laterCount"></span></div>
               <div class="session-list" id="todaySessionList"></div>
+            </div>
+
+            <div class="panel section-panel completed-panel" id="completedTodayPanel">
+              <div class="section-head"><h3>Completed today</h3><span id="completedTodayCount"></span></div>
+              <div class="work-log" id="todayCompletedList"></div>
             </div>
           </div>
 
@@ -1281,7 +1328,7 @@
       const completionLog=safeParse(storageGet(COMPLETION_LOG_KEY),[]);
       state.completionLog=(Array.isArray(completionLog)?completionLog:[]).filter(entry=>entry&&entry.id&&entry.instanceId&&entry.taskId&&Number(entry.minutes)>0).map(entry=>({
         id:String(entry.id),instanceId:String(entry.instanceId),taskId:String(entry.taskId),minutes:Math.max(1,Math.round(Number(entry.minutes))),
-        date:entry.date||dateKey(new Date()),block:BLOCKS.includes(entry.block)?entry.block:"morning",label:String(entry.label||"Done"),completedAt:entry.completedAt||new Date().toISOString()
+        date:entry.date||dateKey(new Date()),block:BLOCKS.includes(entry.block)?entry.block:"morning",plannedDate:entry.plannedDate||entry.date||dateKey(new Date()),plannedBlock:BLOCKS.includes(entry.plannedBlock)?entry.plannedBlock:(BLOCKS.includes(entry.block)?entry.block:"morning"),label:String(entry.label||"Done"),completedAt:entry.completedAt||new Date().toISOString()
       }));
       state.manualMoves=safeParse(storageGet(MANUAL_MOVES_KEY),{})||{};
       state.autoPlacements=safeParse(storageGet(AUTO_PLACEMENTS_KEY),{})||{};
@@ -1332,10 +1379,27 @@
       return state.settings.unavailableBlocks.filter(rule=>rule.block===block&&(rule.recurring?Number(rule.weekday)===date.getDay():rule.date===dateKey(date)));
     }
     function isUnavailable(date,block){return unavailableRulesFor(date,block).length>0}
-    function isSessionDone(key){return String(key||"").startsWith("done:")||state.completedSessions.has(key)}
+    function isSessionDone(key){return String(key||"").startsWith("done:")}
     function completionEntriesForInstance(instanceId){return state.completionLog.filter(entry=>entry.instanceId===instanceId)}
     function completedMinutesForInstance(instanceId){return completionEntriesForInstance(instanceId).reduce((sum,entry)=>sum+Math.max(0,Number(entry.minutes)||0),0)}
     function completedMinutesForTask(taskId){return state.completionLog.filter(entry=>entry.taskId===taskId).reduce((sum,entry)=>sum+Math.max(0,Number(entry.minutes)||0),0)}
+    function completionDay(entry){
+      if(entry?.completedAt){
+        const stamp=new Date(entry.completedAt);
+        if(!Number.isNaN(stamp.getTime()))return dateKey(stamp);
+      }
+      return entry?.date||"";
+    }
+    function completionEntriesOnDate(date){
+      const key=dateKey(date);
+      return state.completionLog.filter(entry=>completionDay(entry)===key).sort((a,b)=>new Date(b.completedAt||0)-new Date(a.completedAt||0));
+    }
+    function completionTimeLabel(entry){
+      const stamp=entry?.completedAt?new Date(entry.completedAt):null;
+      if(stamp&&!Number.isNaN(stamp.getTime()))return formatDate(stamp,{hour:'numeric',minute:'2-digit'});
+      return 'Done';
+    }
+    function taskNameForEntry(entry){return state.tasks.find(task=>task.id===entry.taskId)?.name||'Completed task'}
 
     function createDay(date,index){return {date,index,items:[],blocks:{morning:[],afternoon:[],evening:[]},load:0}}
     function recurringDates(task,horizonEnd){
@@ -1613,6 +1677,8 @@
       const horizonEnd=state.masterPlan.at(-1).date,instances=[];
       let progressMigrated=false,taskCompletionChanged=false;
 
+      if(state.completedSessions.size){state.completedSessions.clear();progressMigrated=true}
+
       state.tasks.forEach(task=>{
         if(task.recurring){
           if(task.completed)return;
@@ -1641,7 +1707,7 @@
           const index=Number.isInteger(parsedIndex)?parsedIndex:order;
           const minutes=Math.max(1,Math.round(fullChunks[index]||focusMinutes(instance.task)));
           const placement=state.autoPlacements[legacyKey]||state.manualMoves[legacyKey]||{};
-          state.completionLog.push({id:uid(),instanceId:instance.instanceId,taskId:instance.task.id,minutes,date:placement.date||dateKey(new Date()),block:BLOCKS.includes(placement.block)?placement.block:state.settings.highEnergyBlock,label:sessionLabel(index,Math.max(1,fullChunks.length)),completedAt:new Date().toISOString()});
+          state.completionLog.push({id:uid(),instanceId:instance.instanceId,taskId:instance.task.id,minutes,date:dateKey(new Date()),plannedDate:placement.date||dateKey(new Date()),block:BLOCKS.includes(placement.block)?placement.block:state.settings.highEnergyBlock,plannedBlock:BLOCKS.includes(placement.block)?placement.block:state.settings.highEnergyBlock,label:sessionLabel(index,Math.max(1,fullChunks.length)),completedAt:new Date().toISOString()});
           state.completedSessions.delete(legacyKey);delete state.autoPlacements[legacyKey];delete state.manualMoves[legacyKey];progressMigrated=true;
         });
       };
@@ -1650,7 +1716,7 @@
         const fullChunks=splitMinutes(instance.task);
         migrateLegacyProgress(instance,fullChunks);
         if(instance.task.completed&&!instance.task.recurring&&completedMinutesForInstance(instance.instanceId)<=0){
-          state.completionLog.push({id:uid(),instanceId:instance.instanceId,taskId:instance.task.id,minutes:instance.task.estimateMinutes,date:dateKey(new Date()),block:state.settings.highEnergyBlock,label:"Complete",completedAt:new Date().toISOString()});
+          state.completionLog.push({id:uid(),instanceId:instance.instanceId,taskId:instance.task.id,minutes:instance.task.estimateMinutes,date:dateKey(new Date()),plannedDate:dateKey(new Date()),block:state.settings.highEnergyBlock,plannedBlock:state.settings.highEnergyBlock,label:"Complete",completedAt:new Date().toISOString()});
           progressMigrated=true;
         }
 
@@ -1662,11 +1728,11 @@
         }
 
         for(const entry of completionEntriesForInstance(instance.instanceId)){
-          const completedDate=parseDate(entry.date);
+          const completedDate=parseDate(completionDay(entry));
           if(!completedDate)continue;
           const dayIndex=daysBetween(start,completedDate);
           if(dayIndex<0||dayIndex>=state.masterPlan.length)continue;
-          archiveItems.push({key:`done:${entry.id}`,instanceId:instance.instanceId,taskId:instance.task.id,task:instance.task,minutes:entry.minutes,label:entry.label||"Done",chunkIndex:-1,chunkCount:0,dueDate:instance.dueDate,flexible:instance.flexible,earliestDayIndex:dayIndex,latestDayIndex:dayIndex,targetDayIndex:dayIndex,targetBlock:entry.block,targetSlotOrdinal:slotOrdinal(dayIndex,entry.block),targetTimelinePosition:blockTimelinePosition(dayIndex,entry.block),priorSlot:{date:entry.date,block:entry.block},block:"",dayIndex:null,pinned:true,isCompleted:true,completedEntryId:entry.id});
+          archiveItems.push({key:`done:${entry.id}`,instanceId:instance.instanceId,taskId:instance.task.id,task:instance.task,minutes:entry.minutes,label:entry.label||"Done",chunkIndex:-1,chunkCount:0,dueDate:instance.dueDate,flexible:instance.flexible,earliestDayIndex:dayIndex,latestDayIndex:dayIndex,targetDayIndex:dayIndex,targetBlock:BLOCKS.includes(entry.plannedBlock)?entry.plannedBlock:entry.block,targetSlotOrdinal:slotOrdinal(dayIndex,BLOCKS.includes(entry.plannedBlock)?entry.plannedBlock:entry.block),targetTimelinePosition:blockTimelinePosition(dayIndex,BLOCKS.includes(entry.plannedBlock)?entry.plannedBlock:entry.block),priorSlot:{date:completionDay(entry),block:BLOCKS.includes(entry.plannedBlock)?entry.plannedBlock:entry.block},block:"",dayIndex:null,pinned:true,isCompleted:true,completedEntryId:entry.id,completedAt:entry.completedAt});
         }
 
         const first=clamp(daysBetween(start,instance.windowStart),0,state.masterPlan.length-1);
@@ -1713,6 +1779,8 @@
       const placed=allItems.filter(item=>item.dayIndex!==null);
       balancePlacedItems(placed);
       calculateOvertime();rememberAutomaticPlacements(allItems);
+
+      if(state.completedSessions.size){state.completedSessions.clear();progressMigrated=true}
 
       state.tasks.forEach(task=>{
         const taskInstances=instances.filter(instance=>instance.task.id===task.id);
@@ -1770,13 +1838,15 @@
     }
 
     function renderToday(){
-      const remaining=incompleteTodayItems();const completed=todayItems().filter(item=>isSessionDone(item.key));
-      const minutes=remaining.reduce((sum,item)=>sum+item.minutes,0);const weekRemaining=currentWeekDays().flatMap(day=>day.items).filter(item=>!isSessionDone(item.key)).reduce((sum,item)=>sum+item.minutes,0);
+      const remaining=incompleteTodayItems();
+      const completedEntries=completionEntriesOnDate(new Date());
+      const minutes=remaining.reduce((sum,item)=>sum+item.minutes,0);
+      const weekRemaining=currentWeekDays().flatMap(day=>day.items).filter(item=>!item.isCompleted&&!isSessionDone(item.key)).reduce((sum,item)=>sum+item.minutes,0);
       const hasActiveTasks=state.tasks.some(task=>!task.completed);
-      const nextFuture=state.masterPlan.slice(1).flatMap(day=>day.items.map(item=>({day,item}))).find(entry=>!isSessionDone(entry.item.key));
+      const nextFuture=state.masterPlan.slice(1).flatMap(day=>day.items.map(item=>({day,item}))).find(entry=>!entry.item.isCompleted&&!isSessionDone(entry.item.key));
       $("todayHeadline").textContent=remaining.length?"Just this, for now.":hasActiveTasks?"You’re done for today.":"What matters now?";
       $("todaySummary").textContent=remaining.length?`${formatMinutes(minutes)} is planned. Everything else can wait.`:hasActiveTasks?(nextFuture?`Next: ${nextFuture.item.task.name} on ${formatDate(nextFuture.day.date,{weekday:"long"})}.`:"Your remaining work is already placed later."):"Add it once. We’ll break it down and make room for it.";
-      $("todayMinutesStat").textContent=formatMinutes(minutes);$("todayBlocksStat").textContent=remaining.length;$("weekMinutesStat").textContent=formatMinutes(weekRemaining);$("doneStat").textContent=completed.length;
+      $("todayMinutesStat").textContent=formatMinutes(minutes);$("todayBlocksStat").textContent=remaining.length;$("weekMinutesStat").textContent=formatMinutes(weekRemaining);$("doneStat").textContent=completedEntries.length;
 
       const unscheduledMinutes=state.unscheduled.reduce((sum,item)=>sum+item.minutes,0),overtimeMinutes=state.overtimeMinutes||0;const banner=$("fitBanner");
       const hasWarning=unscheduledMinutes>0||overtimeMinutes>0;banner.classList.toggle("warning",hasWarning);banner.classList.toggle("hidden",!hasWarning);$("fitIcon").textContent="!";
@@ -1803,6 +1873,16 @@
       const later=remaining.filter(item=>!next||item.key!==next.key);$("laterCount").textContent=later.length?`${later.length} more`:"";
       const laterPanel=$("todaySessionList").closest(".section-panel");laterPanel.classList.toggle("hidden",later.length===0);
       $("todaySessionList").innerHTML=later.map(sessionRowHtml).join("");
+
+      const completedPanel=$("completedTodayPanel");
+      $("completedTodayCount").textContent=completedEntries.length?`${completedEntries.length} block${completedEntries.length===1?"":"s"}`:"";
+      if(!completedEntries.length){
+        completedPanel.classList.add("hidden");
+        $("todayCompletedList").innerHTML='<div class="work-log-empty">No completed blocks yet today.</div>';
+      }else{
+        completedPanel.classList.remove("hidden");
+        $("todayCompletedList").innerHTML=completedEntries.map(entry=>`<div class="work-log-entry"><div class="work-log-time">${completionTimeLabel(entry)}</div><div class="work-log-main"><div class="work-log-title">${escapeHtml(taskNameForEntry(entry))}</div><div class="work-log-meta">${escapeHtml(entry.label||"Done")} · ${formatMinutes(entry.minutes)}${entry.plannedBlock?` · planned for ${BLOCK_LABELS[entry.plannedBlock]}`:""}</div></div><button class="round-action" data-action="undo-log" data-id="${entry.id}" title="Undo this completed block">↺</button></div>`).join("");
+      }
     }
 
     function sessionRowHtml(item){
@@ -1825,14 +1905,14 @@
       const unscheduledMinutes=state.unscheduled.reduce((sum,item)=>sum+item.minutes,0),overtimeMinutes=state.overtimeMinutes||0;
       $("planSubtitle").textContent=unscheduledMinutes?`${formatMinutes(unscheduledMinutes)} cannot fit before its deadline.`:overtimeMinutes?`${formatMinutes(overtimeMinutes)} of emergency overtime is being used near a deadline.`:"Work is balanced by deadline, capacity, and cognitive load.";
       $("weekGrid").innerHTML=days.map(day=>{
-        const open=day.items.filter(item=>!isSessionDone(item.key));const done=day.items.filter(item=>isSessionDone(item.key));const total=open.reduce((sum,item)=>sum+item.minutes,0);const capacity=BLOCKS.reduce((sum,block)=>sum+(isUnavailable(day.date,block)?0:blockCapacity(block)),0);const percent=Math.min(100,Math.round(total/Math.max(1,capacity)*100));
+        const open=day.items.filter(item=>!item.isCompleted&&!isSessionDone(item.key));const doneCount=completionEntriesOnDate(day.date).length;const total=open.reduce((sum,item)=>sum+item.minutes,0);const capacity=BLOCKS.reduce((sum,block)=>sum+(isUnavailable(day.date,block)?0:blockCapacity(block)),0);const percent=Math.min(100,Math.round(total/Math.max(1,capacity)*100));
         const blocks=BLOCKS.map(block=>{
-          const items=day.blocks[block];const rules=unavailableRulesFor(day.date,block);const unavailable=rules.length>0;const recurring=rules.some(rule=>rule.recurring);const ended=day.index===0&&blockState(0,block)==="ended";
+          const items=day.blocks[block].filter(item=>!item.isCompleted);const rules=unavailableRulesFor(day.date,block);const unavailable=rules.length>0;const recurring=rules.some(rule=>rule.recurring);const ended=day.index===0&&blockState(0,block)==="ended";
           const stateCopy=ended?"Ended":unavailable?(recurring?"Weekly unavailable":"Unavailable"):"＋ Unavailable";
           const ariaCopy=ended?`${BLOCK_LABELS[block]} has ended`:unavailable?`Make ${BLOCK_LABELS[block].toLowerCase()} available`:`Mark ${BLOCK_LABELS[block].toLowerCase()} unavailable`;
           return `<div class="block ${unavailable?"unavailable":""}"><button class="block-head block-toggle ${block}" type="button" data-action="toggle-unavailable" data-date="${dateKey(day.date)}" data-block="${block}" aria-label="${ariaCopy}" title="${ariaCopy}" ${ended?"disabled":""}><div>${BLOCK_LABELS[block]}</div><span class="availability-copy ${unavailable?"is-unavailable":""}">${stateCopy}</span></button><div class="block-body">${items.length?items.map(planItemHtml).join(""):`<div class="empty-block">${unavailable?"Unavailable":"Open"}</div>`}</div></div>`;
         }).join("");
-        return `<article class="day-card ${day.index===0?"today":""}"><div class="day-head"><strong>${day.index===0?"Today":formatDate(day.date,{weekday:"short"})}</strong><span>${formatDate(day.date,{month:"short",day:"numeric"})}</span><div class="day-load"><span>${formatMinutes(total)} remaining</span><span>${done.length}/${day.items.length} done</span></div><div class="load-track"><div class="load-fill" style="width:${percent}%"></div></div></div><div class="day-body">${blocks}</div></article>`;
+        return `<article class="day-card ${day.index===0?"today":""}"><div class="day-head"><strong>${day.index===0?"Today":formatDate(day.date,{weekday:"short"})}</strong><span>${formatDate(day.date,{month:"short",day:"numeric"})}</span><div class="day-load"><span>${formatMinutes(total)} remaining</span><span>${doneCount}/${open.length+doneCount} done</span></div><div class="load-track"><div class="load-fill" style="width:${percent}%"></div></div></div><div class="day-body">${blocks}</div></article>`;
       }).join("");
     }
 
@@ -1942,10 +2022,20 @@
         state.completionLog=state.completionLog.filter(entry=>entry.id!==entryId);
         const task=state.tasks.find(t=>t.id===item.taskId);if(task)task.completed=false;
       }else{
-        state.completionLog.push({id:uid(),instanceId:item.instanceId,taskId:item.taskId,minutes:item.minutes,date:dateKey(day.date),block:item.block,label:item.label,completedAt:new Date().toISOString()});
+        state.completionLog.push({id:uid(),instanceId:item.instanceId,taskId:item.taskId,minutes:item.minutes,date:dateKey(new Date()),plannedDate:dateKey(day.date),block:item.block,plannedBlock:item.block,label:item.label,completedAt:new Date().toISOString()});
         delete state.manualMoves[item.key];delete state.autoPlacements[item.key];
       }
       if(save)persist();if(render)renderAll();return true;
+    }
+    function undoCompletionEntry(entryId){
+      const before=state.completionLog.length;
+      state.completionLog=state.completionLog.filter(entry=>entry.id!==entryId);
+      if(state.completionLog.length===before)return;
+      state.tasks.forEach(task=>{if(task.completed){
+        const instanceId=`${task.id}-once`;
+        if(completedMinutesForInstance(instanceId)<task.estimateMinutes)task.completed=false;
+      }});
+      persist();renderAll();showToast("Completed block removed");
     }
     function toggleTask(taskId){
       const task=state.tasks.find(item=>item.id===taskId);if(!task)return;
@@ -1956,7 +2046,7 @@
       }
       if(task.recurring){task.completed=true}else{
         const instanceId=`${task.id}-once`;const alreadyDone=completedMinutesForInstance(instanceId);const remaining=Math.max(0,task.estimateMinutes-alreadyDone);
-        if(remaining>0)state.completionLog.push({id:uid(),instanceId,taskId:task.id,minutes:remaining,date:dateKey(new Date()),block:state.settings.highEnergyBlock,label:"Complete",completedAt:new Date().toISOString()});
+        if(remaining>0)state.completionLog.push({id:uid(),instanceId,taskId:task.id,minutes:remaining,date:dateKey(new Date()),plannedDate:dateKey(new Date()),block:state.settings.highEnergyBlock,plannedBlock:state.settings.highEnergyBlock,label:"Complete",completedAt:new Date().toISOString()});
         task.completed=true;
       }
       persist();renderAll();showToast("Task completed");
@@ -2265,7 +2355,7 @@
 
     function handleAction(event){
       const target=event.target.closest("[data-action]");if(!target)return;const action=target.dataset.action;
-      if(action==="add")openTaskModal();if(action==="start")startFocus(target.dataset.key);if(action==="start-short")startFocus(target.dataset.key,5);if(action==="resume-timer")resumeTimer();if(action==="something-else")doSomethingElse(target.dataset.key);if(action==="complete")toggleSession(target.dataset.key);if(action==="move")openMove(target.dataset.key);if(action==="edit")openTaskModal(target.dataset.id);if(action==="delete")deleteTask(target.dataset.id);if(action==="toggle-task")toggleTask(target.dataset.id);if(action==="delete-unavailable")deleteUnavailable(target.dataset.id);if(action==="toggle-unavailable")toggleBlockUnavailable(target.dataset.date,target.dataset.block);
+      if(action==="add")openTaskModal();if(action==="start")startFocus(target.dataset.key);if(action==="start-short")startFocus(target.dataset.key,5);if(action==="resume-timer")resumeTimer();if(action==="something-else")doSomethingElse(target.dataset.key);if(action==="complete")toggleSession(target.dataset.key);if(action==="move")openMove(target.dataset.key);if(action==="edit")openTaskModal(target.dataset.id);if(action==="delete")deleteTask(target.dataset.id);if(action==="toggle-task")toggleTask(target.dataset.id);if(action==="delete-unavailable")deleteUnavailable(target.dataset.id);if(action==="toggle-unavailable")toggleBlockUnavailable(target.dataset.date,target.dataset.block);if(action==="undo-log")undoCompletionEntry(target.dataset.id);
     }
 
     function setCloudStatus(message){$("cloudStatus").textContent=message}
@@ -2273,7 +2363,7 @@
     function serializeCloudState(){return {schemaVersion:3,tasks:state.tasks,settings:state.settings,completedPlanKeys:[...state.completedSessions],completionLog:state.completionLog,manualMoves:state.manualMoves,autoPlacements:state.autoPlacements,activeTimer:state.activeTimer,clientUpdatedAt:state.localRevisionAt||Date.now()}}
     function applyCloudState(data){
       if(!data||typeof data!=="object")return;state.applyingCloudState=true;
-      try{const cloudSettings=mergeSettings(data.settings||{});state.settings=cloudSettings;state.tasks=(Array.isArray(data.tasks)?data.tasks:[]).map(task=>normalizeTask(task,data.settings||{}));state.completedSessions=new Set(Array.isArray(data.completedPlanKeys)?data.completedPlanKeys:[]);state.completionLog=(Array.isArray(data.completionLog)?data.completionLog:[]).filter(entry=>entry&&entry.id&&entry.instanceId&&entry.taskId&&Number(entry.minutes)>0).map(entry=>({id:String(entry.id),instanceId:String(entry.instanceId),taskId:String(entry.taskId),minutes:Math.max(1,Math.round(Number(entry.minutes))),date:entry.date||dateKey(new Date()),block:BLOCKS.includes(entry.block)?entry.block:"morning",label:String(entry.label||"Done"),completedAt:entry.completedAt||new Date().toISOString()}));state.manualMoves=data.manualMoves&&typeof data.manualMoves==="object"?data.manualMoves:{};state.autoPlacements=data.autoPlacements&&typeof data.autoPlacements==="object"?data.autoPlacements:{};state.activeTimer=data.activeTimer||null;state.localRevisionAt=Number(data.clientUpdatedAt)||Date.now();storageSet(CLOUD_LOCAL_REVISION_KEY,String(state.localRevisionAt));restoreTimerElapsed();if(state.activeTimer){state.activeTimer.running=false;state.activeTimer.updatedAt=Date.now();state.todaySuggestionKey=state.activeTimer.key}persistLocal(false);renderAll()}finally{state.applyingCloudState=false}
+      try{const cloudSettings=mergeSettings(data.settings||{});state.settings=cloudSettings;state.tasks=(Array.isArray(data.tasks)?data.tasks:[]).map(task=>normalizeTask(task,data.settings||{}));state.completedSessions=new Set(Array.isArray(data.completedPlanKeys)?data.completedPlanKeys:[]);state.completionLog=(Array.isArray(data.completionLog)?data.completionLog:[]).filter(entry=>entry&&entry.id&&entry.instanceId&&entry.taskId&&Number(entry.minutes)>0).map(entry=>({id:String(entry.id),instanceId:String(entry.instanceId),taskId:String(entry.taskId),minutes:Math.max(1,Math.round(Number(entry.minutes))),date:entry.date||dateKey(new Date()),block:BLOCKS.includes(entry.block)?entry.block:"morning",plannedDate:entry.plannedDate||entry.date||dateKey(new Date()),plannedBlock:BLOCKS.includes(entry.plannedBlock)?entry.plannedBlock:(BLOCKS.includes(entry.block)?entry.block:"morning"),label:String(entry.label||"Done"),completedAt:entry.completedAt||new Date().toISOString()}));state.manualMoves=data.manualMoves&&typeof data.manualMoves==="object"?data.manualMoves:{};state.autoPlacements=data.autoPlacements&&typeof data.autoPlacements==="object"?data.autoPlacements:{};state.activeTimer=data.activeTimer||null;state.localRevisionAt=Number(data.clientUpdatedAt)||Date.now();storageSet(CLOUD_LOCAL_REVISION_KEY,String(state.localRevisionAt));restoreTimerElapsed();if(state.activeTimer){state.activeTimer.running=false;state.activeTimer.updatedAt=Date.now();state.todaySuggestionKey=state.activeTimer.key}persistLocal(false);renderAll()}finally{state.applyingCloudState=false}
     }
     function cloudDoc(uidValue){return state.firebaseFunctions.doc(state.firebaseDb,"taskItUpUsers",uidValue,"data","appState")}
     async function saveCloudNow(){
