@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#6f8798" />
-  <title>Evenly</title>
+  <title>Manageable</title>
   <!-- Scheduler: least-slack-first + cost-based placement + local-search balancing -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Crect width='128' height='128' rx='28' fill='%23fffefa'/%3E%3Cpath d='M35 44c9-18 49-18 58 0' fill='none' stroke='%2386a293' stroke-width='9' stroke-linecap='round'/%3E%3Cpath d='M37 84c9 18 45 18 54 0' fill='none' stroke='%239992b4' stroke-width='9' stroke-linecap='round'/%3E%3Cpath d='M48 56h32' stroke='%2386a293' stroke-width='9' stroke-linecap='round'/%3E%3Cpath d='M46 69h36' stroke='%236f8798' stroke-width='9' stroke-linecap='round'/%3E%3Cpath d='M48 82h32' stroke='%239992b4' stroke-width='9' stroke-linecap='round' opacity='.0001'/%3E%3C/svg%3E" />
   <style>
@@ -903,12 +903,27 @@
     }
   </style>
 
+
+  <style id="manageable-placement-and-grouping">
+    .task-placement-row{margin-top:20px;padding:16px;border:1px solid var(--line);border-radius:17px;background:rgba(255,255,255,.5)}
+    .task-placement-row .form-row{margin-top:10px}
+    .task-placement-title{font-size:.82rem;color:#59656d}
+    .task-placement-help{margin:9px 0 0;color:var(--muted);font-size:.74rem;line-height:1.45}
+    .block-add-task{width:100%;border:0;border-top:1px dashed var(--line);background:transparent;color:var(--primary);padding:9px 8px;font-size:.72rem;text-align:left}
+    .block-add-task:hover{background:rgba(255,255,255,.5)}
+    .preferred-pill{background:var(--lavender-soft)!important;border-color:#d8d2e6!important;color:#746d91!important}
+    @media(max-width:720px){
+      .task-placement-row{padding:14px}
+      .block-add-task{font-size:.78rem;padding:11px 8px}
+    }
+  </style>
+
 </head>
 <body>
   <div class="app">
     <header class="topbar">
       <div class="brand">
-        <div class="brand-lockup" aria-label="Evenly">
+        <div class="brand-lockup" aria-label="Manageable">
           <svg class="brand-symbol" viewBox="0 0 128 128" role="img" aria-hidden="true">
             <path d="M35 36c8-15 50-15 58 0" fill="none" stroke="#86a293" stroke-width="9" stroke-linecap="round"/>
             <path d="M39 88c8 15 42 15 50 0" fill="none" stroke="#9992b4" stroke-width="9" stroke-linecap="round"/>
@@ -917,7 +932,7 @@
             <path d="M51 77h26" fill="none" stroke="#9992b4" stroke-width="9" stroke-linecap="round"/>
           </svg>
           <div class="brand-wording">
-            <h1>evenly</h1>
+            <h1>manageable</h1>
             <div class="brand-tagline">balance • focus • get things done</div>
             <div class="brand-date" id="headerDate"></div>
           </div>
@@ -1055,6 +1070,14 @@
             <button class="choice" type="button" data-estimate="120">2 hours</button>
           </div>
           <div class="field time-custom"><label for="customEstimate">Or enter a custom time</label><div class="duration-entry"><input id="customEstimate" type="number" min="5" max="120" step="5" value="30" inputmode="decimal" /><select id="customEstimateUnit" aria-label="Time unit"><option value="minutes">Minutes</option><option value="hours">Hours</option></select></div></div>
+          <div class="task-placement-row">
+            <div class="task-placement-title">Where should this work begin?</div>
+            <div class="form-row">
+              <div class="field" style="margin:0"><label for="taskPreferredDate">Preferred date</label><input id="taskPreferredDate" type="date" /></div>
+              <div class="field" style="margin:0"><label for="taskPreferredBlock">Preferred block</label><select id="taskPreferredBlock"><option value="">Let Manageable choose</option><option value="morning">Morning</option><option value="afternoon">Afternoon</option><option value="evening">Evening</option></select></div>
+            </div>
+            <p class="task-placement-help">A chosen block is kept whenever capacity and deadlines allow. If that block has already ended, the task rolls into the next available block.</p>
+          </div>
           <div class="field" style="margin-top:24px"><label>Starting this feels…</label></div>
           <div class="feeling-grid" id="feelingChoices">
             <button class="feeling selected" type="button" data-feeling="neutral">Straightforward</button>
@@ -1234,7 +1257,7 @@
     const state={
       tasks:[],settings:structuredCloneSafe(defaultSettings),completedSessions:new Set(),completionLog:[],manualMoves:{},autoPlacements:{},
       masterPlan:[],unscheduled:[],overtimeMinutes:0,instanceKeys:new Map(),taskProgress:new Map(),weekOffset:0,taskFilter:"active",
-      wizardStep:1,wizardDeadlineChoice:"none",wizardEstimate:30,wizardFeeling:"neutral",wizardSplit:"split",
+      wizardStep:1,wizardDeadlineChoice:"none",wizardEstimate:30,wizardFeeling:"neutral",wizardSplit:"split",taskPlacementPreset:null,
       activeMoveKey:null,unavailableMode:"weekly",activeTimer:null,timerTicker:null,audioContext:null,ambient:null,todaySuggestionKey:null,todayNudgeKey:null,
       firebaseAuth:null,firebaseDb:null,firebaseUser:null,firebaseFunctions:null,cloudUnsubscribe:null,cloudSaveTimer:null,
       applyingCloudState:false,localRevisionAt:0,firebaseInitialized:false
@@ -1305,6 +1328,8 @@
         estimateMinutes:clamp(estimateFromLegacy(task),5,2880),
         deadline:task.deadline||"",
         deadlineBlock:task.deadlineBlock||"",
+        preferredDate:task.preferredDate||"",
+        preferredBlock:BLOCKS.includes(task.preferredBlock)?task.preferredBlock:"",
         feeling:feelingFromLegacy(task),
         recurring:Boolean(task.recurring),
         frequency:task.frequency||"weekly",
@@ -1430,12 +1455,26 @@
 
     function sessionLabel(index,total){if(total===1)return "Finish";if(index===0)return "Start";if(index===total-1)return "Finish";return "Continue"}
     function slotOrdinal(dayIndex,block){return dayIndex*BLOCKS.length+BLOCKS.indexOf(block)}
+    function taskSimilarityKey(task){
+      const category=String(task?.category||"").trim().toLowerCase();
+      if(category)return `area:${category}`;
+      const words=String(task?.name||"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim().split(/\s+/).filter(Boolean);
+      const generic=new Set(["task","work","notes","note","homework","hw","lab","labs","paper","project","lesson","lecture"]);
+      const meaningful=words.filter(word=>!generic.has(word));
+      return `name:${(meaningful.length?meaningful:words).slice(0,2).join("-")}`;
+    }
+    function activeItemsInBlock(day,block){return (day?.blocks?.[block]||[]).filter(other=>!other.isCompleted&&!isSessionDone(other.key))}
+    function groupedForFocus(items){
+      const source=[...items];const first=new Map();
+      source.forEach((item,index)=>{const key=taskSimilarityKey(item.task);if(!first.has(key))first.set(key,index)});
+      return source.sort((a,b)=>BLOCKS.indexOf(a.block)-BLOCKS.indexOf(b.block)||(first.get(taskSimilarityKey(a.task))-first.get(taskSimilarityKey(b.task)))||(a.taskId===b.taskId?a.chunkIndex-b.chunkIndex:0));
+    }
 
     const SCHEDULE_PHASES={
-      initial:{day:105,block:180,cognitive:155,difficulty:75,difficultCount:14,target:5,sameDay:30,sameBlock:46,stability:32,overload:45000},
-      overload:{day:45,block:65,cognitive:40,difficulty:20,difficultCount:5,target:1,sameDay:8,sameBlock:10,stability:8,overload:150000},
-      difficulty:{day:75,block:110,cognitive:300,difficulty:480,difficultCount:70,target:2,sameDay:20,sameBlock:28,stability:18,overload:150000},
-      general:{day:155,block:250,cognitive:190,difficulty:100,difficultCount:18,target:4,sameDay:36,sameBlock:52,stability:26,overload:150000}
+      initial:{day:105,block:180,cognitive:155,difficulty:75,difficultCount:14,target:5,sameDay:24,sameBlock:62,similarDay:8,similarBlock:22,switching:14,preferred:90,stability:32,overload:45000},
+      overload:{day:45,block:65,cognitive:40,difficulty:20,difficultCount:5,target:1,sameDay:8,sameBlock:18,similarDay:3,similarBlock:6,switching:4,preferred:30,stability:8,overload:150000},
+      difficulty:{day:75,block:110,cognitive:300,difficulty:480,difficultCount:70,target:2,sameDay:14,sameBlock:34,similarDay:5,similarBlock:12,switching:8,preferred:45,stability:18,overload:150000},
+      general:{day:155,block:250,cognitive:190,difficulty:100,difficultCount:18,target:4,sameDay:30,sameBlock:76,similarDay:10,similarBlock:28,switching:18,preferred:80,stability:26,overload:150000}
     };
 
     function slotAllowed(item,day,block){
@@ -1472,8 +1511,17 @@
       const blockCogBefore=blockCognitiveLoad(day,block),blockCogAfter=blockCogBefore+minutes*weight;
       const dayCogBefore=dayCognitiveLoad(day),dayCogAfter=dayCogBefore+minutes*weight;
       const blockOver=Math.max(0,blockAfter-blockCap),dayOver=Math.max(0,dayAfter-dayCap);
-      const sameTaskDay=day.items.filter(other=>other.taskId===item.taskId&&!isSessionDone(other.key)).length;
-      const sameTaskBlock=day.blocks[block].filter(other=>other.taskId===item.taskId&&!isSessionDone(other.key)).length;
+      const activeDay=day.items.filter(other=>!other.isCompleted&&!isSessionDone(other.key));
+      const activeBlock=activeItemsInBlock(day,block);
+      const similarity=taskSimilarityKey(item.task);
+      const sameTaskDay=activeDay.filter(other=>other.taskId===item.taskId).length;
+      const sameTaskBlock=activeBlock.filter(other=>other.taskId===item.taskId).length;
+      const similarDay=activeDay.filter(other=>other.taskId!==item.taskId&&taskSimilarityKey(other.task)===similarity).length;
+      const similarBlock=activeBlock.filter(other=>other.taskId!==item.taskId&&taskSimilarityKey(other.task)===similarity).length;
+      const groupCount=new Set(activeBlock.map(other=>taskSimilarityKey(other.task))).size;
+      const preferredDate=item.task.preferredDate||"";
+      const isPreferredDay=!preferredDate||dateKey(day.date)===preferredDate;
+      const preferredDistance=item.task.preferredBlock?Math.abs(BLOCKS.indexOf(block)-BLOCKS.indexOf(item.task.preferredBlock)):0;
       const normalized=x=>x*x;
       let score=0;
       score+=(blockOver*blockOver+dayOver*dayOver)*weights.overload;
@@ -1482,7 +1530,14 @@
       score+=(normalized(blockCogAfter/(blockCap*1.15))-normalized(blockCogBefore/(blockCap*1.15)))*weights.cognitive;
       score+=(normalized(dayCogAfter/(dayCap*1.15))-normalized(dayCogBefore/(dayCap*1.15)))*(weights.cognitive*.45);
       score+=Math.abs(blockTimelinePosition(day.index,block)-item.targetTimelinePosition)*weights.target;
-      score+=sameTaskDay*weights.sameDay+sameTaskBlock*weights.sameBlock;
+      // Reward continuity instead of spreading chunks from the same or related work.
+      score-=sameTaskDay*weights.sameDay+sameTaskBlock*weights.sameBlock;
+      score-=similarDay*(weights.similarDay||0)+similarBlock*(weights.similarBlock||0);
+      if(activeBlock.length&&sameTaskBlock===0&&similarBlock===0)score+=(groupCount+1)*(weights.switching||0);
+      if(item.task.preferredBlock){
+        score+=preferredDistance*(weights.preferred||0);
+        if(isPreferredDay&&block===item.task.preferredBlock)score-=(weights.preferred||0)*1.35;
+      }
       score+=placementChangeDistance(item,day,block)*weights.stability;
       if(item.task.feeling==="difficult"){
         const difficultAfter=difficultBlockLoad(day,block)+minutes;
@@ -1626,10 +1681,31 @@
     }
 
     function balancePlacedItems(items){
-      rebalancePhase(items,"overload",3);
-      rebalancePhase(items,"difficulty",2);
-      rebalancePhase(items,"general",3);
-      rebalanceSwaps(items,"general",2);
+      const activeCount=items.filter(item=>item.dayIndex!==null&&!item.pinned&&!item.isCompleted).length;
+      rebalancePhase(items,"overload",activeCount>100?1:2);
+      rebalancePhase(items,"difficulty",activeCount>100?1:2);
+      rebalancePhase(items,"general",activeCount>80?1:2);
+      if(activeCount<=56)rebalanceSwaps(items,"general",1);
+    }
+
+    function preferredStartForTask(task){
+      if(!task?.preferredBlock)return null;
+      let preferredDate=parseDate(task.preferredDate)||dateStart();
+      if(preferredDate<dateStart())preferredDate=dateStart();
+      const dayIndex=clamp(daysBetween(dateStart(),preferredDate),0,state.masterPlan.length-1);
+      return {dayIndex,blockIndex:Math.max(0,BLOCKS.indexOf(task.preferredBlock))};
+    }
+    function nextPreferredSlot(item){
+      const preferred=preferredStartForTask(item.task);if(!preferred)return null;
+      for(let dayIndex=Math.max(item.earliestDayIndex,preferred.dayIndex);dayIndex<=item.latestDayIndex;dayIndex++){
+        const day=state.masterPlan[dayIndex];if(!day)continue;
+        const firstBlock=dayIndex===preferred.dayIndex?preferred.blockIndex:0;
+        for(let blockIndex=firstBlock;blockIndex<BLOCKS.length;blockIndex++){
+          const block=BLOCKS[blockIndex];
+          if(slotAllowed(item,day,block)&&slotHasHardCapacity(item,day,block))return {day,block,pinned:true,custom:true};
+        }
+      }
+      return null;
     }
 
     function candidateSlotsForInstance(first,last,task,dueDate){
@@ -1687,9 +1763,12 @@
             instances.push({task,dueDate:due,windowStart:new Date(Math.max(start,addDays(due,-windowDays))),instanceId:`${task.id}-rec-${dateKey(due)}`,flexible:false});
           });
         }else{
-          let due=task.deadline?parseDate(task.deadline):addDays(start,13);
+          const requestedStart=task.preferredDate?parseDate(task.preferredDate):start;
+          let windowStart=requestedStart&&requestedStart>start?requestedStart:start;
+          let due=task.deadline?parseDate(task.deadline):addDays(windowStart,13);
           if(due<start)due=start;
-          instances.push({task,dueDate:due,windowStart:start,instanceId:`${task.id}-once`,flexible:!task.deadline});
+          if(windowStart>due)windowStart=due;
+          instances.push({task,dueDate:due,windowStart,instanceId:`${task.id}-once`,flexible:!task.deadline});
         }
       });
 
@@ -1761,6 +1840,10 @@
       const manual=allItems.filter(item=>state.manualMoves[item.key]);
       for(const item of manual){const slot=manualSlotFor(item);if(slot){item.pinned=true;placeItem(item,slot)}else delete state.manualMoves[item.key]}
 
+      const preferredItems=allItems.filter(item=>item.dayIndex===null&&!state.manualMoves[item.key]&&item.task.preferredBlock)
+        .sort((a,b)=>a.earliestDayIndex-b.earliestDayIndex||a.instanceId.localeCompare(b.instanceId)||a.chunkIndex-b.chunkIndex);
+      for(const item of preferredItems){const slot=nextPreferredSlot(item);if(slot){item.pinned=true;placeItem(item,slot)}}
+
       const pendingByInstance=new Map();
       for(const item of allItems.filter(item=>item.dayIndex===null)){
         if(!pendingByInstance.has(item.instanceId))pendingByInstance.set(item.instanceId,[]);
@@ -1796,7 +1879,7 @@
 
     function currentWeekDays(){const start=state.weekOffset*7;return state.masterPlan.slice(start,start+7)}
     function todayItems(){return state.masterPlan[0]?.items||[]}
-    function incompleteTodayItems(){return todayItems().filter(item=>!isSessionDone(item.key)).sort((a,b)=>BLOCKS.indexOf(a.block)-BLOCKS.indexOf(b.block)||a.chunkIndex-b.chunkIndex)}
+    function incompleteTodayItems(){return groupedForFocus(todayItems().filter(item=>!item.isCompleted&&!isSessionDone(item.key)))}
 
     function usableTodaySuggestion(item){
       return item&&!isSessionDone(item.key)&&blockState(0,item.block)!=="ended"&&!isUnavailable(dateStart(),item.block);
@@ -1907,10 +1990,10 @@
       $("weekGrid").innerHTML=days.map(day=>{
         const open=day.items.filter(item=>!item.isCompleted&&!isSessionDone(item.key));const doneCount=completionEntriesOnDate(day.date).length;const total=open.reduce((sum,item)=>sum+item.minutes,0);const capacity=BLOCKS.reduce((sum,block)=>sum+(isUnavailable(day.date,block)?0:blockCapacity(block)),0);const percent=Math.min(100,Math.round(total/Math.max(1,capacity)*100));
         const blocks=BLOCKS.map(block=>{
-          const items=day.blocks[block].filter(item=>!item.isCompleted);const rules=unavailableRulesFor(day.date,block);const unavailable=rules.length>0;const recurring=rules.some(rule=>rule.recurring);const ended=day.index===0&&blockState(0,block)==="ended";
+          const items=groupedForFocus(day.blocks[block].filter(item=>!item.isCompleted));const rules=unavailableRulesFor(day.date,block);const unavailable=rules.length>0;const recurring=rules.some(rule=>rule.recurring);const ended=day.index===0&&blockState(0,block)==="ended";
           const stateCopy=ended?"Ended":unavailable?(recurring?"Weekly unavailable":"Unavailable"):"＋ Unavailable";
           const ariaCopy=ended?`${BLOCK_LABELS[block]} has ended`:unavailable?`Make ${BLOCK_LABELS[block].toLowerCase()} available`:`Mark ${BLOCK_LABELS[block].toLowerCase()} unavailable`;
-          return `<div class="block ${unavailable?"unavailable":""}"><button class="block-head block-toggle ${block}" type="button" data-action="toggle-unavailable" data-date="${dateKey(day.date)}" data-block="${block}" aria-label="${ariaCopy}" title="${ariaCopy}" ${ended?"disabled":""}><div>${BLOCK_LABELS[block]}</div><span class="availability-copy ${unavailable?"is-unavailable":""}">${stateCopy}</span></button><div class="block-body">${items.length?items.map(planItemHtml).join(""):`<div class="empty-block">${unavailable?"Unavailable":"Open"}</div>`}</div></div>`;
+          return `<div class="block ${unavailable?"unavailable":""}"><button class="block-head block-toggle ${block}" type="button" data-action="toggle-unavailable" data-date="${dateKey(day.date)}" data-block="${block}" aria-label="${ariaCopy}" title="${ariaCopy}" ${ended?"disabled":""}><div>${BLOCK_LABELS[block]}</div><span class="availability-copy ${unavailable?"is-unavailable":""}">${stateCopy}</span></button><div class="block-body">${items.length?items.map(planItemHtml).join(""):`<div class="empty-block">${unavailable?"Unavailable":"Open"}</div>`}<button class="block-add-task" type="button" data-action="add-to-block" data-date="${dateKey(day.date)}" data-block="${block}">＋ Add task to ${BLOCK_LABELS[block].toLowerCase()}</button></div></div>`;
         }).join("");
         return `<article class="day-card ${day.index===0?"today":""}"><div class="day-head"><strong>${day.index===0?"Today":formatDate(day.date,{weekday:"short"})}</strong><span>${formatDate(day.date,{month:"short",day:"numeric"})}</span><div class="day-load"><span>${formatMinutes(total)} remaining</span><span>${doneCount}/${open.length+doneCount} done</span></div><div class="load-track"><div class="load-fill" style="width:${percent}%"></div></div></div><div class="day-body">${blocks}</div></article>`;
       }).join("");
@@ -1919,14 +2002,14 @@
     function renderTasks(){
       const activeCount=state.tasks.filter(task=>!task.completed).length;$("taskCountCopy").textContent=`${activeCount} active ${activeCount===1?"task":"tasks"}`;
       const shown=state.tasks.filter(task=>state.taskFilter==="all"||state.taskFilter==="active"&&!task.completed||state.taskFilter==="completed"&&task.completed).sort((a,b)=>Number(a.completed)-Number(b.completed)||(parseDate(a.deadline)||new Date(8640000000000000))-(parseDate(b.deadline)||new Date(8640000000000000)));
-      if(!shown.length){$("taskList").innerHTML=`<div class="empty-state"><h3>${state.taskFilter==="completed"?"No completed tasks yet":"No tasks here"}</h3><p>${state.taskFilter==="completed"?"Completed tasks will appear here.":"Add a task and Task-it-up will build the plan."}</p>${state.taskFilter!=="completed"?`<button class="btn btn-primary" data-action="add">Add a task</button>`:""}</div>`;return}
+      if(!shown.length){$("taskList").innerHTML=`<div class="empty-state"><h3>${state.taskFilter==="completed"?"No completed tasks yet":"No tasks here"}</h3><p>${state.taskFilter==="completed"?"Completed tasks will appear here.":"Add a task and Manageable will build the plan."}</p>${state.taskFilter!=="completed"?`<button class="btn btn-primary" data-action="add">Add a task</button>`:""}</div>`;return}
       $("taskList").innerHTML=shown.map(task=>{
         const progress=state.taskProgress.get(task.id)||{done:0,total:0,doneMinutes:0,totalMinutes:task.estimateMinutes};
         const totalMinutes=Math.max(0,Number(progress.totalMinutes)||task.estimateMinutes);
         const doneMinutes=Math.min(totalMinutes,Math.max(0,Number(progress.doneMinutes)||0));
         const percent=task.completed?100:totalMinutes?Math.round(doneMinutes/totalMinutes*100):0;
         const progressCopy=task.completed?`Complete · ${formatMinutes(doneMinutes)} checked off`:`${formatMinutes(doneMinutes)} of ${formatMinutes(totalMinutes)} checked off${progress.total?` · ${progress.total-progress.done} blocks left`:""}`;
-        return `<div class="task-card ${task.completed?"completed":""}"><div class="task-card-main"><h3>${escapeHtml(task.name)}</h3><div class="task-card-meta"><span class="pill">${formatMinutes(task.estimateMinutes)}</span>${task.deadline?`<span class="pill">Due ${formatDate(parseDate(task.deadline),{month:"short",day:"numeric"})}</span>`:`<span class="pill">Flexible</span>`}${task.category?`<span class="pill">${escapeHtml(task.category)}</span>`:""}${task.recurring?`<span class="pill">Repeats ${task.frequency}</span>`:""}</div><div class="task-progress"><div class="task-progress-copy"><span>${progressCopy}</span><span>${percent}%</span></div><div class="task-progress-track"><div class="task-progress-fill" style="width:${percent}%"></div></div></div></div><div class="task-card-actions"><button class="round-action" data-action="toggle-task" data-id="${task.id}" title="${task.completed?"Reopen":"Complete task"}">${task.completed?"↺":"✓"}</button><button class="round-action" data-action="edit" data-id="${task.id}" title="Edit">✎</button><button class="round-action" data-action="delete" data-id="${task.id}" title="Delete">×</button></div></div>`;
+        return `<div class="task-card ${task.completed?"completed":""}"><div class="task-card-main"><h3>${escapeHtml(task.name)}</h3><div class="task-card-meta"><span class="pill">${formatMinutes(task.estimateMinutes)}</span>${task.deadline?`<span class="pill">Due ${formatDate(parseDate(task.deadline),{month:"short",day:"numeric"})}</span>`:`<span class="pill">Flexible</span>`}${task.category?`<span class="pill">${escapeHtml(task.category)}</span>`:""}${task.preferredBlock?`<span class="pill preferred-pill">Starts ${task.preferredDate?formatDate(parseDate(task.preferredDate),{month:"short",day:"numeric"})+" · ":""}${BLOCK_LABELS[task.preferredBlock]}</span>`:""}${task.recurring?`<span class="pill">Repeats ${task.frequency}</span>`:""}</div><div class="task-progress"><div class="task-progress-copy"><span>${progressCopy}</span><span>${percent}%</span></div><div class="task-progress-track"><div class="task-progress-fill" style="width:${percent}%"></div></div></div></div><div class="task-card-actions"><button class="round-action" data-action="toggle-task" data-id="${task.id}" title="${task.completed?"Reopen":"Complete task"}">${task.completed?"↺":"✓"}</button><button class="round-action" data-action="edit" data-id="${task.id}" title="Edit">✎</button><button class="round-action" data-action="delete" data-id="${task.id}" title="Delete">×</button></div></div>`;
       }).join("");
     }
 
@@ -1988,14 +2071,15 @@
       selectButtons("estimateChoices","data-estimate",String(safe));
     }
     function resetTaskWizard(){
-      $("taskForm").reset();$("editingTaskId").value="";$("taskDeadline").value="";$("taskWeekday").value=String(new Date().getDay());$("recurringFields").classList.add("hidden");$("keepTogetherSwitch").checked=false;$("moreOptions").classList.add("hidden");$("moreOptionsButton").textContent="＋ More options";
+      $("taskForm").reset();$("editingTaskId").value="";$("taskDeadline").value="";$("taskPreferredDate").value="";$("taskPreferredBlock").value="";$("taskWeekday").value=String(new Date().getDay());$("recurringFields").classList.add("hidden");$("keepTogetherSwitch").checked=false;$("moreOptions").classList.add("hidden");$("moreOptionsButton").textContent="＋ More options";
       state.wizardDeadlineChoice="none";state.wizardEstimate=30;state.wizardFeeling="neutral";state.wizardSplit="split";
       syncCustomDeadlineHighlight();setEstimateInputFromMinutes(30,{preferHours:false});
       selectButtons("deadlineChoices","data-deadline-choice","none");selectButtons("estimateChoices","data-estimate","30");selectButtons("feelingChoices","data-feeling","neutral");selectButtons("splitChoices","data-split","split");setWizardStep(1);$("taskModalTitle").textContent="Add a task";$("saveTaskButton").textContent="Add task";
     }
-    function openTaskModal(taskId=null){
-      resetTaskWizard();
-      if(taskId){const task=state.tasks.find(item=>item.id===taskId);if(!task)return;$("editingTaskId").value=task.id;$("taskName").value=task.name;$("taskDeadline").value=task.deadline;setEstimateInputFromMinutes(task.estimateMinutes);$("taskCategory").value=task.category;$("taskNotes").value=task.notes;$("taskRecurring").checked=task.recurring;$("taskFrequency").value=task.frequency;$("taskWeekday").value=String(task.weekday);$("taskRepeatUntil").value=task.repeatUntil;state.wizardDeadlineChoice="custom";state.wizardEstimate=task.estimateMinutes;state.wizardFeeling=task.feeling==="difficult"?"difficult":"neutral";state.wizardSplit=task.allAtOnce?"together":"split";$("keepTogetherSwitch").checked=task.allAtOnce;selectButtons("deadlineChoices","data-deadline-choice","custom");selectButtons("estimateChoices","data-estimate",String(task.estimateMinutes));selectButtons("feelingChoices","data-feeling",task.feeling);selectButtons("splitChoices","data-split",state.wizardSplit);if(task.recurring||task.category||task.notes){$("moreOptions").classList.remove("hidden");$("moreOptionsButton").textContent="− Fewer options"}$("recurringFields").classList.toggle("hidden",!task.recurring);syncCustomDeadlineHighlight();$("taskModalTitle").textContent="Edit task";$("saveTaskButton").textContent="Save changes";}
+    function openTaskModal(taskId=null,preset=null){
+      resetTaskWizard();state.taskPlacementPreset=preset||null;
+      if(preset){$("taskPreferredDate").value=preset.date||dateKey(new Date());$("taskPreferredBlock").value=BLOCKS.includes(preset.block)?preset.block:""}
+      if(taskId){const task=state.tasks.find(item=>item.id===taskId);if(!task)return;$("editingTaskId").value=task.id;$("taskName").value=task.name;$("taskDeadline").value=task.deadline;$("taskPreferredDate").value=task.preferredDate||"";$("taskPreferredBlock").value=task.preferredBlock||"";setEstimateInputFromMinutes(task.estimateMinutes);$("taskCategory").value=task.category;$("taskNotes").value=task.notes;$("taskRecurring").checked=task.recurring;$("taskFrequency").value=task.frequency;$("taskWeekday").value=String(task.weekday);$("taskRepeatUntil").value=task.repeatUntil;state.wizardDeadlineChoice="custom";state.wizardEstimate=task.estimateMinutes;state.wizardFeeling=task.feeling==="difficult"?"difficult":"neutral";state.wizardSplit=task.allAtOnce?"together":"split";$("keepTogetherSwitch").checked=task.allAtOnce;selectButtons("deadlineChoices","data-deadline-choice","custom");selectButtons("estimateChoices","data-estimate",String(task.estimateMinutes));selectButtons("feelingChoices","data-feeling",task.feeling);selectButtons("splitChoices","data-split",state.wizardSplit);if(task.recurring||task.category||task.notes){$("moreOptions").classList.remove("hidden");$("moreOptionsButton").textContent="− Fewer options"}$("recurringFields").classList.toggle("hidden",!task.recurring);syncCustomDeadlineHighlight();$("taskModalTitle").textContent="Edit task";$("saveTaskButton").textContent="Save changes";}
       $("taskBackdrop").classList.remove("hidden");$("taskModal").classList.remove("hidden");document.body.style.overflow="hidden";
     }
     function closeTaskModal(){$("taskBackdrop").classList.add("hidden");$("taskModal").classList.add("hidden");document.body.style.overflow=""}
@@ -2008,7 +2092,8 @@
       event.preventDefault();const name=$("taskName").value.trim();if(!name){setWizardStep(1);showToast("Add a task name");return}
       const id=$("editingTaskId").value;const current=state.tasks.find(task=>task.id===id);
       const recurring=$("taskRecurring").checked;
-      const task={id:id||uid(),name,notes:$("taskNotes").value.trim(),category:$("taskCategory").value.trim(),estimateMinutes:estimateMinutesFromInput(),deadline:chosenDeadline(),deadlineBlock:"",feeling:state.wizardFeeling,recurring,frequency:$("taskFrequency").value,weekday:Number($("taskWeekday").value),repeatUntil:$("taskRepeatUntil").value,allAtOnce:$("keepTogetherSwitch").checked||state.wizardSplit==="together",completed:recurring?Boolean(current?.completed):false,createdAt:current?.createdAt||new Date().toISOString()};
+      const preferredBlock=$("taskPreferredBlock").value;
+      const task={id:id||uid(),name,notes:$("taskNotes").value.trim(),category:$("taskCategory").value.trim(),estimateMinutes:estimateMinutesFromInput(),deadline:chosenDeadline(),deadlineBlock:"",preferredDate:preferredBlock?$("taskPreferredDate").value:"",preferredBlock:BLOCKS.includes(preferredBlock)?preferredBlock:"",feeling:state.wizardFeeling,recurring,frequency:$("taskFrequency").value,weekday:Number($("taskWeekday").value),repeatUntil:$("taskRepeatUntil").value,allAtOnce:$("keepTogetherSwitch").checked||state.wizardSplit==="together",completed:recurring?Boolean(current?.completed):false,createdAt:current?.createdAt||new Date().toISOString()};
       if(current)state.tasks[state.tasks.findIndex(item=>item.id===id)]=task;else state.tasks.push(task);
       persist();closeTaskModal();renderAll();switchView("todayView");showToast(current?"Task updated":"Task added to your plan");
     }
@@ -2355,7 +2440,7 @@
 
     function handleAction(event){
       const target=event.target.closest("[data-action]");if(!target)return;const action=target.dataset.action;
-      if(action==="add")openTaskModal();if(action==="start")startFocus(target.dataset.key);if(action==="start-short")startFocus(target.dataset.key,5);if(action==="resume-timer")resumeTimer();if(action==="something-else")doSomethingElse(target.dataset.key);if(action==="complete")toggleSession(target.dataset.key);if(action==="move")openMove(target.dataset.key);if(action==="edit")openTaskModal(target.dataset.id);if(action==="delete")deleteTask(target.dataset.id);if(action==="toggle-task")toggleTask(target.dataset.id);if(action==="delete-unavailable")deleteUnavailable(target.dataset.id);if(action==="toggle-unavailable")toggleBlockUnavailable(target.dataset.date,target.dataset.block);if(action==="undo-log")undoCompletionEntry(target.dataset.id);
+      if(action==="add")openTaskModal();if(action==="add-to-block")openTaskModal(null,{date:target.dataset.date,block:target.dataset.block});if(action==="start")startFocus(target.dataset.key);if(action==="start-short")startFocus(target.dataset.key,5);if(action==="resume-timer")resumeTimer();if(action==="something-else")doSomethingElse(target.dataset.key);if(action==="complete")toggleSession(target.dataset.key);if(action==="move")openMove(target.dataset.key);if(action==="edit")openTaskModal(target.dataset.id);if(action==="delete")deleteTask(target.dataset.id);if(action==="toggle-task")toggleTask(target.dataset.id);if(action==="delete-unavailable")deleteUnavailable(target.dataset.id);if(action==="toggle-unavailable")toggleBlockUnavailable(target.dataset.date,target.dataset.block);if(action==="undo-log")undoCompletionEntry(target.dataset.id);
     }
 
     function setCloudStatus(message){$("cloudStatus").textContent=message}
